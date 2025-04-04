@@ -1,51 +1,59 @@
-FROM node:18-alpine AS base
+# Multi-stage build for the frontend application
 
-# Install dependencies only when needed
-FROM base AS deps
+# Base stage for dependencies
+FROM node:18-alpine AS base
 WORKDIR /app
 
-# Copy package files
+# Install dependencies - this is done in a separate stage so that it can be cached
+FROM base AS deps
 COPY package.json package-lock.json* ./
-
-# Install dependencies
 RUN npm ci
 
-# Rebuild the source code only when needed
+# Development stage - used when developing locally
+FROM base AS dev
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
+EXPOSE 3000
+CMD ["npm", "run", "dev"]
+
+# Builder stage - build the production application
 FROM base AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-# Next.js collects anonymous telemetry data about general usage
-# Learn more here: https://nextjs.org/telemetry
+# Set environment variables
+ARG NODE_ENV=production
+ENV NODE_ENV=${NODE_ENV}
 ENV NEXT_TELEMETRY_DISABLED 1
 
 # Build the application
 RUN npm run build
 
-# Production image, copy all the files and run next
+# Production stage - run the built application
 FROM base AS runner
 WORKDIR /app
 
 ENV NODE_ENV production
 ENV NEXT_TELEMETRY_DISABLED 1
 
-# Create a non-root user
+# Add a non-root user
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 USER nextjs
 
-# Copy necessary files
-COPY --from=builder /app/public ./public
+# Copy the built application from the builder stage
+COPY --from=builder --chown=nextjs:nodejs /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
-# Expose port
+# Expose the port the app will run on
 EXPOSE 3000
 
-# Set up environment variables
+# Set the host and port for the application
 ENV PORT 3000
 ENV HOSTNAME "0.0.0.0"
 
-# Start the server
+# Run the application
 CMD ["node", "server.js"]

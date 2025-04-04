@@ -1,0 +1,51 @@
+version: '3.8'
+
+# Development-specific overrides
+
+services:
+  # Frontend in development mode with hot reloading
+  frontend:
+    build:
+      target: dev
+    volumes:
+      - ../frontend:/app
+      - /app/node_modules
+    command: npm run dev
+    environment:
+      - NODE_ENV=development
+
+  # Backend with auto-reload
+  backend:
+    volumes:
+      - ../backend:/app
+    environment:
+      - DEBUG=true
+      - LOG_LEVEL=debug
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+
+  # Data pipeline in development mode
+  data-pipeline:
+    volumes:
+      - ../data-pipeline:/app
+    environment:
+      - LOG_LEVEL=debug
+
+  # Milvus with development settings
+  milvus-standalone:
+    ports:
+      - "19530:19530"  # Expose API port for direct access in development
+      - "9091:9091"    # Expose UI port
+
+  # Redis with development settings
+  redis:
+    ports:
+      - "6379:6379"    # Expose Redis port for direct access
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-ashes_default_pass} --loglevel debug
+
+  # Disable Nginx in development (direct access to services)
+  nginx:
+    profiles: ["disabled"]
+    
+  # Disable Certbot in development
+  certbot:
+    profiles: ["disabled"]

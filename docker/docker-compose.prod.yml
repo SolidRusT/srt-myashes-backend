@@ -1,0 +1,97 @@
+version: '3.8'
+
+# Production-specific overrides
+
+services:
+  # Frontend optimized for production
+  frontend:
+    restart: always
+    build:
+      args:
+        - NODE_ENV=production
+    environment:
+      - NODE_ENV=production
+
+  # Backend optimized for production
+  backend:
+    restart: always
+    environment:
+      - DEBUG=false
+      - LOG_LEVEL=info
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+  # Data pipeline optimized for production
+  data-pipeline:
+    restart: always
+    environment:
+      - LOG_LEVEL=info
+
+  # Milvus with production settings
+  milvus-standalone:
+    restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 4G
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "10"
+
+  # Redis with production settings
+  redis:
+    restart: always
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD} --maxmemory 1gb --maxmemory-policy allkeys-lru
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1.5G
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "10"
+
+  # Etcd with production settings
+  etcd:
+    restart: always
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "10"
+
+  # MinIO with production settings
+  minio:
+    restart: always
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "10"
+
+  # Nginx with production settings
+  nginx:
+    restart: always
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "10"
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+
+  # Certbot with production settings
+  certbot:
+    restart: on-failure
