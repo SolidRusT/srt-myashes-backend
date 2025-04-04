@@ -1,0 +1,178 @@
+version: '3.8'
+
+services:
+  # Frontend application (Next.js)
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=/api
+    depends_on:
+      - backend
+    networks:
+      - ashes-network
+    restart: unless-stopped
+
+  # Backend API service
+  backend:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - MILVUS_HOST=milvus-standalone
+      - MILVUS_PORT=19530
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPENAI_API_BASE=${OPENAI_API_BASE:-https://api.openai.com/v1}
+      - LOG_LEVEL=info
+    volumes:
+      - ../backend/app:/app
+    depends_on:
+      - milvus-standalone
+      - redis
+    networks:
+      - ashes-network
+    restart: unless-stopped
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+  # Data pipeline service (for scraping, processing, and indexing)
+  data-pipeline:
+    build:
+      context: ../data-pipeline
+      dockerfile: Dockerfile
+    environment:
+      - MILVUS_HOST=milvus-standalone
+      - MILVUS_PORT=19530
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - SCRAPE_INTERVAL=86400  # 24 hours in seconds
+      - LOG_LEVEL=info
+    volumes:
+      - ../data-pipeline/app:/app
+      - game-data:/data
+    depends_on:
+      - milvus-standalone
+      - redis
+    networks:
+      - ashes-network
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+  # Milvus vector database
+  milvus-standalone:
+    image: milvusdb/milvus:v2.3.3
+    environment:
+      - ETCD_ENDPOINTS=etcd:2379
+      - MINIO_ADDRESS=minio:9000
+    volumes:
+      - milvus-data:/var/lib/milvus
+    ports:
+      - "19530:19530"
+      - "9091:9091"
+    networks:
+      - ashes-network
+    depends_on:
+      - etcd
+      - minio
+    restart: unless-stopped
+
+  # Etcd for Milvus
+  etcd:
+    image: quay.io/coreos/etcd:v3.5.5
+    environment:
+      - ETCD_AUTO_COMPACTION_MODE=revision
+      - ETCD_AUTO_COMPACTION_RETENTION=1000
+      - ETCD_QUOTA_BACKEND_BYTES=4294967296
+      - ETCD_SNAPSHOT_COUNT=50000
+    volumes:
+      - etcd-data:/etcd
+    command: etcd --advertise-client-urls=http://127.0.0.1:2379 --listen-client-urls http://0.0.0.0:2379 --data-dir /etcd
+    networks:
+      - ashes-network
+    restart: unless-stopped
+
+  # MinIO for Milvus
+  minio:
+    image: minio/minio:RELEASE.2023-03-20T20-16-18Z
+    environment:
+      - MINIO_ACCESS_KEY=minioadmin
+      - MINIO_SECRET_KEY=minioadmin
+    volumes:
+      - minio-data:/data
+    command: minio server /data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+    networks:
+      - ashes-network
+    restart: unless-stopped
+
+  # Redis for caching and session management
+  redis:
+    image: redis:7.0-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-ashes_default_pass}
+    networks:
+      - ashes-network
+    restart: unless-stopped
+
+  # Nginx as reverse proxy with SSL
+  nginx:
+    image: nginx:1.25-alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ../nginx/conf:/etc/nginx/conf.d
+      - ../nginx/ssl:/etc/nginx/ssl
+      - ../nginx/www:/var/www/html
+      - ../nginx/letsencrypt:/etc/letsencrypt
+    depends_on:
+      - frontend
+      - backend
+    networks:
+      - ashes-network
+    restart: unless-stopped
+
+  # Certbot for Let's Encrypt SSL
+  certbot:
+    image: certbot/certbot
+    volumes:
+      - ../nginx/www:/var/www/html
+      - ../nginx/letsencrypt:/etc/letsencrypt
+    depends_on:
+      - nginx
+    command: certonly --webroot --webroot-path=/var/www/html --email admin@myashes.ai --agree-tos --no-eff-email -d myashes.ai -d www.myashes.ai
+
+networks:
+  ashes-network:
+    driver: bridge
+
+volumes:
+  milvus-data:
+  etcd-data:
+  minio-data:
+  redis-data:
+  game-data:
