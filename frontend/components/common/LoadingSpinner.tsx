@@ -1,16 +1,22 @@
 'use client'
 
-export default function LoadingSpinner({ size = 'medium' }: { size?: 'small' | 'medium' | 'large' }) {
-  const sizeClass = {
+interface LoadingSpinnerProps {
+  size?: 'small' | 'medium' | 'large' | 'lg'
+  className?: string
+}
+
+export default function LoadingSpinner({ size = 'medium', className = '' }: LoadingSpinnerProps) {
+  const sizeClasses = {
     small: 'w-4 h-4',
     medium: 'w-6 h-6',
     large: 'w-8 h-8',
+    lg: 'w-12 h-12'
   }
-
+  
   return (
-    <div className="flex justify-center items-center">
+    <div className={`${sizeClasses[size]} ${className}`}>
       <svg
-        className={`animate-spin ${sizeClass[size]} text-blue-600 dark:text-blue-400`}
+        className="animate-spin text-blue-600 dark:text-blue-400"
         xmlns="http://www.w3.org/2000/svg"
         fill="none"
         viewBox="0 0 24 24"
