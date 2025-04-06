@@ -21,7 +21,7 @@ services:
     environment:
       - DEBUG=true
       - LOG_LEVEL=debug
-    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
   # Data pipeline in development mode
   data-pipeline:
@@ -35,6 +35,11 @@ services:
     ports:
       - "19530:19530"  # Expose API port for direct access in development
       - "9091:9091"    # Expose UI port
+    environment:
+      - ETCD_USE_EMBED=true
+      - COMMON_SECURITY_ENABLED=true
+      - COMMON_SECURITY_USERNAME=${MILVUS_USER:-milvus_user}
+      - COMMON_SECURITY_PASSWORD=${MILVUS_PASSWORD:-milvus_password}
 
   # Redis with development settings
   redis:
@@ -42,9 +47,13 @@ services:
       - "6379:6379"    # Expose Redis port for direct access
     command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-ashes_default_pass} --loglevel debug
 
-  # Disable Nginx in development (direct access to services)
+  # Development-friendly Nginx configuration
   nginx:
-    profiles: ["disabled"]
+    volumes:
+      - ../nginx/conf/myashes.dev.conf:/etc/nginx/conf.d/default.conf
+    depends_on:
+      - frontend
+      - backend
     
   # Disable Certbot in development
   certbot:
