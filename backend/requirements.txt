@@ -1,7 +1,7 @@
 # Web framework
 fastapi>=0.104.1,<0.110.0
 uvicorn>=0.24.0,<0.30.0
-pydantic>=2.7.4,<3.0.0  # Updated to be compatible with langchain
+pydantic>=2.0.0,<2.7.0  # Compatible with langchain 0.2.x
 pydantic-settings>=2.0.3,<2.2.0
 
 # Database
@@ -29,8 +29,8 @@ python-dotenv>=1.0.0,<2.0.0
 
 # Machine learning
 sentence-transformers>=2.2.2,<2.3.0
-langchain>=0.3.23,<0.4.0  # Requires pydantic>=2.7.4
-langchain-openai>=0.0.2,<0.1.0
+langchain>=0.2.0,<0.3.0  # Updated to a more compatible version
+langchain-openai>=0.1.0,<0.2.0  # Updated to be compatible with langchain 0.2.x
 
 # Image processing
 pillow>=11.1.0,<11.2.0

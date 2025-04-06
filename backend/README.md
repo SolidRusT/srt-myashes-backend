@@ -95,8 +95,9 @@ Key dependency groups:
 
 ### Dependency Compatibility Notes
 
-- **Pydantic**: The project uses Pydantic 2.7.4+ to ensure compatibility with LangChain 0.3.23
-- **FastAPI**: Works with the newer Pydantic versions
+- **LangChain Ecosystem**: The project uses LangChain 0.2.x and LangChain-OpenAI 0.1.x for AI features
+- **Pydantic**: Compatible with Pydantic 2.0.0-2.6.x, which works well with FastAPI and LangChain 0.2.x
+- **FastAPI**: Works with the Pydantic versions specified
 - **PyTorch**: The PyTorch dependencies (torch, torchvision, torchaudio) have platform-specific wheels. It's recommended to install them using the official instructions from the PyTorch website based on your specific platform and CUDA version.
 
 ### Database Migrations
