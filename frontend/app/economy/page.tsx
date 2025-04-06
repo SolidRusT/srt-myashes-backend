@@ -385,7 +385,11 @@ export default function EconomyTracker() {
                 <div className="h-80">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart
-                      data={sortedResources}
+                      data={sortedResources.map(item => ({
+                        ...item,
+                        positiveChange: item.change >= 0 ? item.change : 0,
+                        negativeChange: item.change < 0 ? item.change : 0
+                      }))}
                       margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
                     >
                       <CartesianGrid strokeDasharray="3 3" />
@@ -393,7 +397,8 @@ export default function EconomyTracker() {
                       <YAxis />
                       <Tooltip />
                       <Legend />
-                      <Bar dataKey="change" fill={(data) => data.change >= 0 ? "#82ca9d" : "#ff7373"} />
+                      <Bar dataKey="positiveChange" name="Positive Change" fill="#82ca9d" />
+                      <Bar dataKey="negativeChange" name="Negative Change" fill="#ff7373" />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
