@@ -10,21 +10,27 @@ export default function ServerSelector() {
   useEffect(() => {
     const fetchServers = async () => {
       try {
+        console.log('Fetching servers list...');
         const response = await fetch('/api/v1/servers')
         if (response.ok) {
           const data = await response.json()
+          console.log('Servers API response:', data);
           if (data.servers && Array.isArray(data.servers)) {
-            useServersStore.getState().setServers(data.servers)
+            // Extract server names from the response
+            const serverNames = data.servers.map(server => server.name);
+            useServersStore.getState().setServers(serverNames);
           }
+        } else {
+          console.error('Error fetching servers:', response.status, response.statusText);
         }
       } catch (error) {
-        console.error('Error fetching servers:', error)
+        console.error('Error fetching servers:', error);
       }
     }
     
     // Only fetch if we have the default servers (could add a stale check too)
     if (servers.length <= 2) {
-      fetchServers()
+      fetchServers();
     }
   }, [servers.length])
   

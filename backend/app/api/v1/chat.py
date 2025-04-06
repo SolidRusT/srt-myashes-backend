@@ -3,8 +3,8 @@ from pydantic import BaseModel, Field
 from typing import List, Dict, Any, Optional
 import uuid
 from datetime import datetime
-from services.llm_service import LLMService
-from services.cache_service import set_cache, get_cache_value
+from app.services.llm_service import LLMService
+from app.services.cache_service import set_cache, get_cache_value
 from loguru import logger
 
 router = APIRouter()

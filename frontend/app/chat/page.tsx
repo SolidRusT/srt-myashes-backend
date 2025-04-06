@@ -71,6 +71,11 @@ export default function ChatPage() {
       })
 
       // Call the API
+      console.log('Sending chat request:', {
+        messages: apiMessages,
+        server: selectedServer || undefined,
+        temperature: 0.7
+      });
       const response = await fetch('/api/v1/chat/completions', {
         method: 'POST',
         headers: {
@@ -84,7 +89,14 @@ export default function ChatPage() {
       })
 
       if (!response.ok) {
-        throw new Error('Failed to get response from AI')
+        console.error('API Error:', response.status, response.statusText);
+        try {
+          const errorData = await response.json();
+          console.error('Error details:', errorData);
+          throw new Error(`Failed to get response from AI: ${errorData.detail || response.statusText}`);
+        } catch (e) {
+          throw new Error(`Failed to get response from AI: ${response.statusText}`);
+        }
       }
 
       const data = await response.json()

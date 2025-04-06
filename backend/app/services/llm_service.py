@@ -3,9 +3,9 @@ from typing import List, Dict, Any, Optional, Tuple
 import json
 import httpx
 from loguru import logger
-from config import settings
+from app.config import settings
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
-from services.vector_store import query_vector_store
+from app.services.vector_store import query_vector_store
 
 class LLMService:
     """Service for interacting with the Language Model API."""
@@ -62,6 +62,10 @@ class LLMService:
         
         # Format the context
         context_text = "Relevant information from the Ashes of Creation knowledge base:\n\n"
+        
+        # Handle the case when no relevant documents are found
+        if not relevant_docs:
+            context_text += "No specific information found in the knowledge base for this query.\n\n"
         
         for i, doc in enumerate(relevant_docs, 1):
             context_text += f"[Document {i}]\n"

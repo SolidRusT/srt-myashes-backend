@@ -1,5 +1,5 @@
 import redis.asyncio as redis
-from config import settings
+from app.config import settings
 from loguru import logger
 from typing import Any, Optional
 import json

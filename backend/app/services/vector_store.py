@@ -1,5 +1,5 @@
 from pymilvus import connections, Collection, utility
-from config import settings
+from app.config import settings
 from loguru import logger
 import numpy as np
 from typing import List, Dict, Any, Optional
@@ -72,20 +72,29 @@ def query_vector_store(query: str, limit: int = 5, filters: Optional[Dict[str, A
     Returns:
         A list of documents with their metadata and relevance scores
     """
-    vector_store = get_vector_store()
-    
-    if vector_store is None:
-        logger.error("Vector store not initialized")
+    try:
+        vector_store = get_vector_store()
+        
+        if vector_store is None:
+            logger.error("Vector store not initialized")
+            return []
+    except Exception as e:
+        logger.error(f"Error accessing vector store: {e}")
+        # Return empty results rather than crashing
         return []
     
-    # Generate embedding for the query
-    query_embedding = generate_embeddings([query])[0]
-    
-    # Prepare search parameters
-    search_params = {
-        "metric_type": "COSINE",
-        "params": {"nprobe": 10},
-    }
+    try:
+        # Generate embedding for the query
+        query_embedding = generate_embeddings([query])[0]
+        
+        # Prepare search parameters
+        search_params = {
+            "metric_type": "COSINE",
+            "params": {"nprobe": 10},
+        }
+    except Exception as e:
+        logger.error(f"Error generating embeddings: {e}")
+        return []
     
     # Prepare output fields
     output_fields = ["id", "text", "metadata", "source", "type", "server"]
@@ -105,14 +114,18 @@ def query_vector_store(query: str, limit: int = 5, filters: Optional[Dict[str, A
             expr = " && ".join(filter_expressions)
     
     # Execute search
-    results = vector_store.search(
-        data=[query_embedding],
-        anns_field="embedding",
-        param=search_params,
-        limit=limit,
-        expr=expr,
-        output_fields=output_fields,
-    )
+    try:
+        results = vector_store.search(
+            data=[query_embedding],
+            anns_field="embedding",
+            param=search_params,
+            limit=limit,
+            expr=expr,
+            output_fields=output_fields,
+        )
+    except Exception as e:
+        logger.error(f"Error searching vector store: {e}")
+        return []
     
     # Format results
     formatted_results = []
