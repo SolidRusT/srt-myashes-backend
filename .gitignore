@@ -148,6 +148,7 @@ grafana/
 data/
 uploads/
 downloads/
+nginx/letsencrypt/accounts/
 
 # pytest
 .pytest_cache/
