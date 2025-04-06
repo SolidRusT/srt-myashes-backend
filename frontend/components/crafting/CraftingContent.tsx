@@ -51,8 +51,8 @@ export default function CraftingContent() {
         setRecipes(data.recipes || [])
         
         // Extract unique categories and skills
-        const uniqueCategories = [...new Set(data.recipes.map((r: Recipe) => r.category))]
-        const uniqueSkills = [...new Set(data.recipes.map((r: Recipe) => r.skillRequired))]
+        const uniqueCategories: string[] = Array.from(new Set(data.recipes.map((r: Recipe) => r.category)))
+        const uniqueSkills: string[] = Array.from(new Set(data.recipes.map((r: Recipe) => r.skillRequired)))
         
         setCategories(uniqueCategories)
         setSkills(uniqueSkills)
