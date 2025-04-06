@@ -93,9 +93,11 @@ Key dependency groups:
 4. **AI/ML**: PyTorch, Sentence-Transformers, LangChain
 5. **Auxiliary**: Redis, HTTPX, Discord.py
 
-### PyTorch Installation
+### Dependency Compatibility Notes
 
-The PyTorch dependencies (torch, torchvision, torchaudio) have platform-specific wheels. It's recommended to install them using the official instructions from the PyTorch website based on your specific platform and CUDA version.
+- **Pydantic**: The project uses Pydantic 2.7.4+ to ensure compatibility with LangChain 0.3.23
+- **FastAPI**: Works with the newer Pydantic versions
+- **PyTorch**: The PyTorch dependencies (torch, torchvision, torchaudio) have platform-specific wheels. It's recommended to install them using the official instructions from the PyTorch website based on your specific platform and CUDA version.
 
 ### Database Migrations
 
