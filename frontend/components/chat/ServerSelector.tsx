@@ -3,6 +3,14 @@
 import { useEffect } from 'react'
 import { useServersStore } from '@/stores/serversStore'
 
+// Define server interface based on the API response
+interface ServerResponse {
+  name: string;
+  status?: string;
+  population?: string;
+  region?: string;
+}
+
 export default function ServerSelector() {
   const { servers, selectedServer, selectServer } = useServersStore()
   
@@ -17,7 +25,7 @@ export default function ServerSelector() {
           console.log('Servers API response:', data);
           if (data.servers && Array.isArray(data.servers)) {
             // Extract server names from the response
-            const serverNames = data.servers.map(server => server.name);
+            const serverNames = data.servers.map((server: ServerResponse) => server.name);
             useServersStore.getState().setServers(serverNames);
           }
         } else {
