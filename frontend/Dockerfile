@@ -1,7 +1,7 @@
 # Multi-stage build for the frontend application
 
 # Base stage for dependencies
-FROM node:18-alpine AS base
+FROM node:18-slim AS base
 WORKDIR /app
 
 # Install dependencies - this is done in a separate stage so that it can be cached
@@ -23,10 +23,20 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
+# Install build dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3 \
+    make \
+    g++ \
+    && rm -rf /var/lib/apt/lists/*
+
+# Ensure SWC dependencies are installed
+RUN npm install @next/swc-linux-x64-gnu --no-save
+
 # Set environment variables
 ARG NODE_ENV=production
 ENV NODE_ENV=${NODE_ENV}
-ENV NEXT_TELEMETRY_DISABLED 1
+ENV NEXT_TELEMETRY_DISABLED=1
 
 # Build the application
 RUN npm run build
@@ -36,11 +46,11 @@ FROM base AS runner
 WORKDIR /app
 
 ENV NODE_ENV production
-ENV NEXT_TELEMETRY_DISABLED 1
+ENV NEXT_TELEMETRY_DISABLED=1
 
 # Add a non-root user
-RUN addgroup --system --gid 1001 nodejs
-RUN adduser --system --uid 1001 nextjs
+RUN groupadd --system --gid 1001 nodejs
+RUN useradd --system --uid 1001 --gid nodejs nextjs
 USER nextjs
 
 # Copy the built application from the builder stage
