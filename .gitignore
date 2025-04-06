@@ -1,0 +1,156 @@
+# Environment variables and secrets
+.env
+.env.local
+.env.development
+.env.test
+.env.production
+.env.staging
+*.env
+
+# Python - Backend/Data Pipeline
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib64/
+parts/
+sdist/
+var/
+*.egg-info/
+.installed.cfg
+*.egg
+.pytest_cache/
+.coverage
+htmlcov/
+coverage.xml
+
+# Virtual environments
+venv/
+ENV/
+env/
+.venv/
+.env/
+env.bak/
+venv.bak/
+.python-version
+
+# Node.js - Frontend
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+.next/
+out/
+.vercel
+.turbo
+*.tsbuildinfo
+next-env.d.ts
+.cache/
+public/workbox-*.js
+public/sw.js
+
+# IDEs and editors
+.idea/
+.vscode/
+*.swp
+*.swo
+*.swn
+.DS_Store
+.project
+.classpath
+.c9/
+*.launch
+*.sublime-workspace
+*.sublime-project
+
+# Docker
+.docker/
+docker-compose.override.yml
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+
+# Database files
+*.sqlite
+*.sqlite3
+*.db
+*.sql.gz
+
+# Build artifacts and caches
+.cache/
+.parcel-cache/
+.webpack/
+.nuxt/
+dist/
+coverage/
+.nyc_output/
+.docz/
+.serverless/
+.fusebox/
+.dynamodb/
+.tern-port
+storybook-static/
+
+# Generated content
+/frontend/public/workbox-*.js
+/frontend/public/sw.js
+/data-pipeline/app/output/
+/data-pipeline/temp/
+/backend/app/output/
+generated/
+
+# OS specific
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Vector store dumps
+vector_store/
+milvus/
+
+# Temporary files
+tmp/
+temp/
+.tmp/
+*.tmp
+*.bak
+*.swp
+*~.nib
+
+# Backup files
+backups/
+*.backup
+*~
+*.bak
+
+# Monitoring output
+*.prom
+prometheus/
+grafana/
+
+# Application data directories
+data/
+uploads/
+downloads/
+
+# pytest
+.pytest_cache/
+.coverage
+coverage.xml
+*.cover
