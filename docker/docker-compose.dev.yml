@@ -49,3 +49,12 @@ services:
   # Disable Certbot in development
   certbot:
     profiles: ["disabled"]
+    
+  # PostgreSQL with development settings
+  postgres:
+    ports:
+      - "5432:5432"    # Expose PostgreSQL port for direct access
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+      - POSTGRES_DB=${POSTGRES_DB:-ashes_dev}
