@@ -55,7 +55,7 @@ pip install -r requirements.txt
 
 ```bash
 # For CUDA 11.8 compatibility
-pip install torch==2.1.2 torchvision==0.16.2 torchaudio==2.1.2 --index-url https://download.pytorch.org/whl/cu118
+pip install torch==2.4.0 torchvision==0.19.0 torchaudio==2.4.0 --index-url https://download.pytorch.org/whl/cu118
 ```
 
 4. Set up environment variables (create a `.env` file with required variables)
@@ -95,7 +95,7 @@ Key dependency groups:
 
 ### Dependency Compatibility Notes
 
-- **PyTorch Ecosystem**: The project uses PyTorch 2.1.2, torchvision 0.16.2, and torchaudio 2.1.2, which form a compatible set
+- **PyTorch Ecosystem**: The project uses PyTorch 2.4.0, torchvision 0.19.0, and torchaudio 2.4.0, which form a compatible set
 - **LangChain Ecosystem**: The project uses LangChain 0.2.x and LangChain-OpenAI 0.1.x for AI features
 - **Pydantic**: Compatible with Pydantic 2.0.0-2.6.x, which works well with FastAPI and LangChain 0.2.x
 - **FastAPI**: Works with the Pydantic versions specified
