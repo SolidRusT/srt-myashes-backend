@@ -7,6 +7,8 @@ services:
     ports:
       - "3000:3000"
     environment:
+      - HOSTNAME=0.0.0.0
+      - NEXT_PUBLIC_HOSTNAME=orpheus
       - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-/api}
     depends_on:
       - backend
@@ -21,6 +23,7 @@ services:
       dockerfile: Dockerfile
     ports:
       - "8000:8000"
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
     environment:
       - MILVUS_HOST=milvus-standalone
       - MILVUS_PORT=19530
@@ -174,17 +177,14 @@ services:
       - ashes-network
     restart: unless-stopped
 
-  # Nginx as reverse proxy with SSL
+  # Nginx as reverse proxy
   nginx:
     image: nginx:1.25-alpine
     ports:
       - "80:80"
-      - "443:443"
     volumes:
-      - ../nginx/conf:/etc/nginx/conf.d
-      - ../nginx/ssl:/etc/nginx/ssl
+      - ../nginx/conf/local.conf:/etc/nginx/conf.d/default.conf
       - ../nginx/www:/var/www/html
-      - ../nginx/letsencrypt:/etc/letsencrypt
     depends_on:
       - frontend
       - backend
@@ -192,15 +192,7 @@ services:
       - ashes-network
     restart: unless-stopped
 
-  # Certbot for Let's Encrypt SSL
-  certbot:
-    image: certbot/certbot
-    volumes:
-      - ../nginx/www:/var/www/html
-      - ../nginx/letsencrypt:/etc/letsencrypt
-    depends_on:
-      - nginx
-    command: certonly --webroot --webroot-path=/var/www/html --email admin@myashes.ai --agree-tos --no-eff-email -d myashes.ai -d www.myashes.ai
+  # Certbot removed for local development
 
   # PostgreSQL Database
   postgres:

@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     PASSWORD_RESET_TOKEN_EXPIRE_HOURS: int = 24  # 24 hours
     
     # CORS configuration
-    BACKEND_CORS_ORIGINS: List[AnyHttpUrl] = []
+    BACKEND_CORS_ORIGINS: List[str] = ["http://localhost", "http://localhost:3000", "http://localhost:8000", "http://nginx", "http://orpheus", "http://orpheus:3000", "http://orpheus:8000", "*"]
     
     @validator("BACKEND_CORS_ORIGINS", pre=True)
     def assemble_cors_origins(cls, v: Union[str, List[str]]) -> Union[List[str], str]:
