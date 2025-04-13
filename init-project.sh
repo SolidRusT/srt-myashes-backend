@@ -83,12 +83,12 @@ print_success "Generated secure Redis password."
 
 # Pull required Docker images
 print_status "Pulling required Docker images..."
-docker-compose -f docker/docker-compose.yml pull
+docker compose -f docker/docker-compose.yml pull
 print_success "Pulled Docker images."
 
 # Start the environment
 print_status "Starting Docker containers..."
-docker-compose -f docker/docker-compose.yml up -d
+docker compose -f docker/docker-compose.yml up -d
 print_success "Started Docker containers."
 
 # Display next steps
@@ -110,8 +110,8 @@ echo "Frontend URL: http://localhost:3000 (or https://$DOMAIN_NAME)"
 echo "API URL: http://localhost:8000/docs (for API documentation)"
 echo ""
 echo "To check container status:"
-echo "  docker-compose -f docker/docker-compose.yml ps"
+echo "  docker compose -f docker/docker-compose.yml ps"
 echo ""
 echo "To view logs:"
-echo "  docker-compose -f docker/docker-compose.yml logs -f"
+echo "  docker compose -f docker/docker-compose.yml logs -f"
 echo ""
