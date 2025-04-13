@@ -24,7 +24,7 @@ check_command() {
 }
 
 check_command docker
-check_command docker-compose
+check_command "docker compose"
 
 # Create .env file if it doesn't exist
 if [ ! -f "docker/.env" ]; then
