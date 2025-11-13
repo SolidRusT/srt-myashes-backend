@@ -11,13 +11,13 @@ from datetime import datetime
 import re
 from io import BytesIO
 import emoji
-from config import settings
-from services.llm_service import LLMService
-from services.vector_store import query_vector_store
-from services.item_service import ItemService
-from services.build_service import BuildService
-from services.server_service import ServerService
-from services.location_service import LocationService
+from app.core.config import settings
+from app.services.llm_service import LLMService
+from app.services.vector_store import query_vector_store
+from app.services.item_service import ItemService
+from app.services.build_service import BuildService
+from app.services.server_service import ServerService
+from app.services.location_service import LocationService
 
 # Initialize services
 llm_service = LLMService()

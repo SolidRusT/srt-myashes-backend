@@ -1,7 +1,8 @@
 import os
 import secrets
 from typing import List, Optional, Dict, Any, Union
-from pydantic import BaseSettings, PostgresDsn, validator, AnyHttpUrl, EmailStr
+from pydantic import AnyHttpUrl, EmailStr, field_validator, model_validator, ConfigDict
+from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
     # API configuration
@@ -14,7 +15,8 @@ class Settings(BaseSettings):
     # CORS configuration
     BACKEND_CORS_ORIGINS: List[str] = ["http://localhost", "http://localhost:3000", "http://localhost:8000", "http://nginx", "http://orpheus", "http://orpheus:3000", "http://orpheus:8000", "*"]
     
-    @validator("BACKEND_CORS_ORIGINS", pre=True)
+    @field_validator("BACKEND_CORS_ORIGINS", mode='before')
+    @classmethod
     def assemble_cors_origins(cls, v: Union[str, List[str]]) -> Union[List[str], str]:
         if isinstance(v, str) and not v.startswith("["):
             return [i.strip() for i in v.split(",")]
@@ -28,20 +30,22 @@ class Settings(BaseSettings):
     POSTGRES_USER: str = os.getenv("POSTGRES_USER", "postgres")
     POSTGRES_PASSWORD: str = os.getenv("POSTGRES_PASSWORD", "postgres")
     POSTGRES_DB: str = os.getenv("POSTGRES_DB", "app")
-    SQLALCHEMY_DATABASE_URI: Optional[PostgresDsn] = None
-    
-    @validator("SQLALCHEMY_DATABASE_URI", pre=True)
-    def assemble_db_connection(cls, v: Optional[str], values: Dict[str, Any]) -> Any:
-        if isinstance(v, str):
-            return v
-        return PostgresDsn.build(
-            scheme="postgresql",
-            user=values.get("POSTGRES_USER"),
-            password=values.get("POSTGRES_PASSWORD"),
-            host=values.get("POSTGRES_HOST"),
-            port=values.get("POSTGRES_PORT"),
-            path=f"/{values.get('POSTGRES_DB') or ''}",
-        )
+    SQLALCHEMY_DATABASE_URI: Optional[str] = None
+
+    @model_validator(mode='before')
+    @classmethod
+    def assemble_db_connection(cls, values: Dict[str, Any]) -> Dict[str, Any]:
+        if values.get("SQLALCHEMY_DATABASE_URI"):
+            return values
+
+        user = values.get("POSTGRES_USER")
+        password = values.get("POSTGRES_PASSWORD")
+        host = values.get("POSTGRES_HOST")
+        port = values.get("POSTGRES_PORT")
+        db = values.get("POSTGRES_DB")
+
+        values["SQLALCHEMY_DATABASE_URI"] = f"postgresql://{user}:{password}@{host}:{port}/{db}"
+        return values
     
     # Email configuration
     SMTP_TLS: bool = True
@@ -71,9 +75,8 @@ class Settings(BaseSettings):
     DEBUG: bool = ENV == "development"
     APP_NAME: str = "MyAshes.ai"
     WEBSITE_URL: str = os.getenv("WEBSITE_URL", "https://myashes.ai")
-    
-    class Config:
-        case_sensitive = True
+
+    model_config = ConfigDict(case_sensitive=True)
 
 
 settings = Settings()

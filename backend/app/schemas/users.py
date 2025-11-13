@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr, Field, validator
+from pydantic import BaseModel, EmailStr, Field, field_validator, ConfigDict
 from typing import Optional, Dict, Any
 from datetime import datetime
 
@@ -15,9 +15,8 @@ class UserRead(UserBase):
     is_verified: bool
     is_premium: bool
     created_at: datetime
-    
-    class Config:
-        orm_mode = True
+
+    model_config = ConfigDict(from_attributes=True)
 
 
 class UserUpdate(BaseModel):
@@ -30,8 +29,9 @@ class UserUpdate(BaseModel):
 class UserPasswordUpdate(BaseModel):
     current_password: str
     new_password: str = Field(..., min_length=8)
-    
-    @validator('new_password')
+
+    @field_validator('new_password')
+    @classmethod
     def password_complexity(cls, v):
         """
         Validate password complexity.
@@ -50,9 +50,8 @@ class UserPreferences(BaseModel):
     dark_mode: bool = False
     compact_layout: bool = False
     additional_preferences: Optional[Dict[str, Any]] = None
-    
-    class Config:
-        orm_mode = True
+
+    model_config = ConfigDict(from_attributes=True)
 
 
 class SavedItemCreate(BaseModel):
@@ -64,9 +63,8 @@ class SavedItemRead(SavedItemCreate):
     id: int
     user_id: int
     created_at: datetime
-    
-    class Config:
-        orm_mode = True
+
+    model_config = ConfigDict(from_attributes=True)
 
 
 class SavedItemUpdate(BaseModel):

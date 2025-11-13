@@ -17,6 +17,7 @@ email-validator>=2.1.0,<2.2.0
 
 # Vector database
 pymilvus>=2.3.0,<2.4.0
+marshmallow>=3.13.0,<4.0.0  # Pin to 3.x for environs compatibility
 
 # Cache
 redis>=5.0.1,<6.0.0
@@ -28,7 +29,7 @@ httpx>=0.25.1,<0.27.0
 python-dotenv>=1.0.0,<2.0.0
 
 # Machine learning
-sentence-transformers>=2.2.2,<2.3.0
+sentence-transformers>=2.7.0  # Updated for huggingface_hub compatibility
 langchain>=0.2.0,<0.3.0  # Updated to a more compatible version
 langchain-openai>=0.1.0,<0.2.0  # Updated to be compatible with langchain 0.2.x
 

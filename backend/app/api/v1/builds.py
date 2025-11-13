@@ -3,8 +3,8 @@ from pydantic import BaseModel, Field
 from typing import List, Dict, Any, Optional
 import uuid
 from datetime import datetime
-from services.vector_store import query_vector_store
-from services.cache_service import set_cache, get_cache_value
+from app.services.vector_store import query_vector_store
+from app.services.cache_service import set_cache, get_cache_value
 from loguru import logger
 
 router = APIRouter()
@@ -425,7 +425,7 @@ async def update_build(build_id: str, build_update: BuildUpdate = Body(...)):
             detail="Failed to update build"
         )
 
-@router.delete("/{build_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{build_id}", response_model=None, status_code=status.HTTP_204_NO_CONTENT)
 async def delete_build(build_id: str):
     """
     Delete a character build.

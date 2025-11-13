@@ -60,7 +60,7 @@ async def update_user_profile(
     user = update_user(db, db_obj=user, obj_in=user_in)
     return user
 
-@router.put("/password", status_code=status.HTTP_204_NO_CONTENT)
+@router.put("/password", response_model=None, status_code=status.HTTP_204_NO_CONTENT)
 async def update_password(
     password_update: UserPasswordUpdate,
     current_user: UserRead = Depends(get_current_user),

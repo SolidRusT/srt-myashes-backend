@@ -2,8 +2,8 @@ from fastapi import APIRouter, Depends, HTTPException, status, Query
 from pydantic import BaseModel, Field
 from typing import List, Dict, Any, Optional
 import uuid
-from services.vector_store import query_vector_store
-from services.cache_service import set_cache, get_cache_value
+from app.services.vector_store import query_vector_store
+from app.services.cache_service import set_cache, get_cache_value
 from loguru import logger
 
 router = APIRouter()

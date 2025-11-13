@@ -109,7 +109,7 @@ async def refresh_token(
         "user": current_user
     }
 
-@router.post("/forgot-password", status_code=status.HTTP_204_NO_CONTENT)
+@router.post("/forgot-password", response_model=None, status_code=status.HTTP_204_NO_CONTENT)
 async def forgot_password(
     request: PasswordResetRequest,
     background_tasks: BackgroundTasks,
@@ -134,7 +134,7 @@ async def forgot_password(
     # Always return 204 even if user doesn't exist to prevent email enumeration
     return None
 
-@router.post("/reset-password", status_code=status.HTTP_204_NO_CONTENT)
+@router.post("/reset-password", response_model=None, status_code=status.HTTP_204_NO_CONTENT)
 async def reset_password(
     reset_data: PasswordReset,
     db: Session = Depends(get_db)
