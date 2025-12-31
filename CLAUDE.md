@@ -2,7 +2,7 @@
 
 **Project**: AI-powered assistant backend for Ashes of Creation MMORPG
 **Status**: K8s deployment ready (backend only)
-**Last Updated**: 2025-12-30
+**Last Updated**: 2025-12-31
 **Shaun's Golden Rule**: **No workarounds, no temporary fixes, no disabled functionality. Full solutions only.**
 
 ---
@@ -67,8 +67,13 @@ The backend is deployed on the SRT-HQ Kubernetes platform and integrates with:
 **External Domain**: myashes.ai (proxied via Artemis)
 **Internal Domain**: myashes-backend.lab.hq.solidrust.net
 
-**Key Features**:
-- AI chat assistant for game mechanics
+**Current Status** (2025-12-31):
+- ✅ **Landing page LIVE** with working AI chat at https://myashes.ai
+- ✅ **Frontend uses Artemis vLLM directly** (no backend needed for basic chat)
+- 🔲 **This backend NOT YET deployed** - will add semantic search, user accounts, etc.
+
+**Key Features** (when deployed):
+- AI chat assistant with knowledge base grounding
 - Character build planning
 - Item database with semantic search
 - Crafting calculator
@@ -77,19 +82,29 @@ The backend is deployed on the SRT-HQ Kubernetes platform and integrates with:
 - Vector similarity search (Milvus)
 - Database migrations (Alembic)
 
-**Architecture**:
+**Current Architecture** (LIVE):
 ```
-Frontend (myashes.ai - GitHub Pages)
-│   └─→ SolidRusT/myashes.github.io
+myashes.ai (GitHub Pages) ✅ LIVE
+    ↓ JavaScript fetch()
+Artemis Proxy (AWS) ✅ CORS enabled
+    ↓
+vLLM Chat (Qwen3-4B) ✅ Working
+```
+
+**Future Architecture** (when this backend deploys):
+```
+myashes.ai (GitHub Pages)
     ↓
 Artemis Proxy (AWS HTTP/3)
     ↓
 K8s Ingress (myashes-backend.lab.hq.solidrust.net)
     ↓
-FastAPI Backend (2 replicas)
-│   └─→ Suparious/ashes-of-creation-assistant (this repo)
+FastAPI Backend (2 replicas) ← THIS REPO
+│   └─→ Suparious/ashes-of-creation-assistant
     ↓
 Platform PostgreSQL (CNPG) + Platform Milvus (Vector DB)
+    ↓
+vLLM Chat + srt-data-layer (knowledge base)
 ```
 
 ---
@@ -512,6 +527,8 @@ You're doing well if:
 
 | Date | Change | Impact |
 |------|--------|--------|
+| 2025-12-31 | AI chat LIVE on landing page | myashes.ai now has working chat via Artemis vLLM |
+| 2025-12-31 | CORS enabled on Artemis | Frontend can call vLLM API directly |
 | 2025-12-30 | Landing page live | myashes.ai deployed via SolidRusT/myashes.github.io |
 | 2025-12-30 | Updated paths to macOS | Migrated from WSL to native macOS |
 | 2025-11-12 | Initial onboarding | Backend added to SRT-HQ K8s platform |
@@ -522,7 +539,7 @@ You're doing well if:
 
 ---
 
-**Last Updated**: 2025-12-30
+**Last Updated**: 2025-12-31
 **Status**: K8s Deployment Ready (Backend Only)
 **Platform**: SRT-HQ Kubernetes
 **Access**: https://myashes-backend.lab.hq.solidrust.net
