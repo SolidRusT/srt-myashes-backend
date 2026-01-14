@@ -1,533 +1,249 @@
-# CLAUDE.md - MyAshes.ai Backend Agent Context
+# CLAUDE.md - Ashes of Creation Assistant Backend
 
-**Project**: AI-powered assistant backend for Ashes of Creation MMORPG
-**Status**: K8s deployment ready (backend only)
-**Last Updated**: 2025-12-31
+**Project**: Community backend for Ashes of Creation game assistant
+**Status**: NEEDS DISCOVERY & REFACTORING - Built before shared platform existed
+**Visibility**: PUBLIC (community collaboration)
+**Last Updated**: 2026-01-14
 **Shaun's Golden Rule**: **No workarounds, no temporary fixes, no disabled functionality. Full solutions only.**
 
 ---
 
-## ⚡ AGENT QUICK START
+## CRITICAL: READ THIS FIRST
 
-**Your job**: Help with MyAshes.ai Backend - FastAPI application with ML/AI capabilities on Kubernetes.
+This repository was built **before** the SolidRusT shared platform matured. The platform now provides:
+- **srt-data-layer**: RAG, vector search, MeiliSearch, Milvus, knowledge graph
+- **srt-hq-k8s**: Mature K8s cluster with KEDA, FluxCD, Artemis proxy
+- **Artemis**: Inference proxy with CORS for frontend integration
 
-**Shaun's top rule**: No workarounds, no temporary fixes, complete solutions only.
-
-**Where to start**:
-1. Read "Project Overview" below
-2. Understand this deploys BACKEND ONLY (frontend is GitHub Pages)
-3. Check deployment dependencies (PostgreSQL, Milvus)
-4. Check srt-hq-k8s CLAUDE.md for platform integration questions
+**Your first task in any session**: Run discovery to understand what this repo does and what's redundant.
 
 ---
 
-## 📚 PLATFORM INTEGRATION
+## Strategic Context
 
-**Related Repositories**:
-- **srt-hq-k8s**: `/Users/shaun/repos/srt-hq-k8s/` - Kubernetes platform (12 nodes)
-- **srt-hq-vllm**: `/Users/shaun/repos/srt-hq-vllm/` - vLLM inference backend
-- **srt-data-layer**: `/Users/shaun/repos/srt-data-layer/` - Data Layer API (knowledge base)
-- **myashes.github.io**: `/Users/shaun/repos/myashes.github.io/` - Frontend landing page
-
-**Platform Features Used**:
-- **PostgreSQL**: CNPG cluster for relational data
-- **Milvus**: Vector store for embeddings (prediction-engine namespace)
-- **vLLM**: `http://vllm.inference.svc.cluster.local:8000/v1` for AI inference
-- **Ingress**: nginx-ingress with TLS (cert-manager DNS-01)
-
-**When NOT to Query**:
-- ❌ FastAPI development (use FastAPI docs)
-- ❌ Python/ML libraries (use requirements.txt + docs)
-- ❌ Application business logic (see backend/ source code)
-- ❌ Docker build process (use Dockerfile + build-and-push.ps1)
-
----
-
-## 📍 PROJECT OVERVIEW
-
-**Application Type**: RESTful API backend for Ashes of Creation game assistant
-**Tech Stack**: Python 3.11 + FastAPI + ML/AI libraries
-**Deployment**: K8s backend only (frontend deployed separately to GitHub Pages)
-**External Domain**: myashes.ai (proxied via Artemis)
-**Internal Domain**: myashes-backend.lab.hq.solidrust.net
-
-**Current Status** (2025-12-31):
-- ✅ **Landing page LIVE** with working AI chat at https://myashes.ai
-- ✅ **Frontend uses Artemis vLLM directly** (no backend needed for basic chat)
-- 🔲 **This backend NOT YET deployed** - will add semantic search, user accounts, etc.
-
-**Key Features** (when deployed):
-- AI chat assistant with knowledge base grounding
-- Character build planning
-- Item database with semantic search
-- Crafting calculator
-- Resource tracking
-- User authentication (JWT)
-- Vector similarity search (Milvus)
-- Database migrations (Alembic)
-
-**Current Architecture** (LIVE):
 ```
-myashes.ai (GitHub Pages) ✅ LIVE
-    ↓ JavaScript fetch()
-Artemis Proxy (AWS) ✅ CORS enabled
-    ↓
-vLLM Chat (Qwen3-4B) ✅ Working
-```
-
-**Future Architecture** (when this backend deploys):
-```
-myashes.ai (GitHub Pages)
-    ↓
-Artemis Proxy (AWS HTTP/3)
-    ↓
-K8s Ingress (myashes-backend.lab.hq.solidrust.net)
-    ↓
-FastAPI Backend (2 replicas) ← THIS REPO
-│   └─→ Suparious/ashes-of-creation-assistant
-    ↓
-Platform PostgreSQL (CNPG) + Platform Milvus (Vector DB)
-    ↓
-vLLM Chat + srt-data-layer (knowledge base)
+┌─────────────────────────────────────────────────────────────┐
+│  myashes.github.io (PRIVATE)                                │
+│  - Frontend at https://myashes.ai                           │
+│  - Flagship product for SolidRusT Networks                  │
+│  - Already LIVE with AI chat via Artemis                    │
+└─────────────────────────────────────────────────────────────┘
+                            │
+                            ▼
+┌─────────────────────────────────────────────────────────────┐
+│  Artemis Proxy (AWS)                                        │
+│  - CORS-enabled gateway for all API calls                   │
+│  - Routes to K8s services                                   │
+└─────────────────────────────────────────────────────────────┘
+                            │
+            ┌───────────────┴───────────────┐
+            ▼                               ▼
+┌───────────────────────┐       ┌───────────────────────────┐
+│  srt-data-layer       │       │  THIS REPO (when deployed)│
+│  - RAG/vector search  │       │  - User accounts?         │
+│  - MeiliSearch        │       │  - Build sharing?         │
+│  - Milvus embeddings  │       │  - Discord bot?           │
+│  - Knowledge graph    │       │  - What else is needed?   │
+│  ✅ ALREADY DEPLOYED  │       │  ⚠️ NOT YET DEPLOYED      │
+└───────────────────────┘       └───────────────────────────┘
 ```
 
 ---
 
-## 🗂️ LOCATIONS
+## Discovery Checklist
 
-**Repository**:
-- GitHub: `git@github.com:Suparious/ashes-of-creation-assistant.git`
-- Submodule: `/Users/shaun/repos/srt-hq-k8s/manifests/apps/myashes-backend/`
-- Standalone: `/Users/shaun/repos/ashes-of-creation-assistant/`
+Before any implementation work, you MUST understand:
 
-**Landing Page** (separate repo):
-- GitHub: `git@github.com:SolidRusT/myashes.github.io.git`
-- Location: `/Users/shaun/repos/myashes.github.io/`
-- Live: https://myashes.ai
+### 1. What does this repo currently provide?
+- [ ] Review `backend/app/api/v1/` - what endpoints exist?
+- [ ] Review `backend/app/services/` - what services are implemented?
+- [ ] Review `backend/app/models/` - what database models exist?
+- [ ] Review `data-pipeline/` - what scraping/ingestion exists?
 
-**Deployment**:
-- Dev: `cd backend && uvicorn app.main:app --reload` → `http://localhost:8000`
-- Docker Test: `docker run -p 8000:8000 suparious/myashes-backend:latest`
-- Production: `https://myashes-backend.lab.hq.solidrust.net` (K8s namespace: `myashes-backend`)
-- API Docs: `https://myashes-backend.lab.hq.solidrust.net/docs` (Swagger UI)
+### 2. What's now handled by srt-data-layer?
+- [ ] Check `/Users/shaun/repos/srt-data-layer/CLAUDE.md`
+- [ ] Vector search / embeddings → likely redundant
+- [ ] RAG / semantic search → likely redundant
+- [ ] Knowledge base queries → likely redundant
 
-**Images**:
-- Docker Hub: `suparious/myashes-backend:latest`
-- Public URL: `https://hub.docker.com/r/suparious/myashes-backend`
+### 3. What's still needed from this repo?
+- [ ] User authentication (JWT)?
+- [ ] User accounts and profiles?
+- [ ] Character build persistence?
+- [ ] Build sharing / social features?
+- [ ] Discord bot integration?
+- [ ] Rate limiting / usage tracking?
 
-**Backend Source**:
-- All backend code is in `backend/` subdirectory of the repository
-- App code: `backend/app/`
-- Migrations: `backend/migrations/`
-
----
-
-## 🛠️ TECH STACK
-
-### Backend (Python + FastAPI)
-- **FastAPI**: 0.104+ (web framework)
-- **Uvicorn**: 0.24+ (ASGI server)
-- **Pydantic**: 2.0+ (data validation)
-- **SQLAlchemy**: 2.0+ (ORM)
-- **Alembic**: 1.13+ (database migrations)
-- **PostgreSQL**: psycopg2-binary (database driver)
-
-### AI/ML Libraries
-- **PyTorch**: 2.7.1 (deep learning)
-- **sentence-transformers**: 2.2.2 (embeddings)
-- **langchain**: 0.2.x (LLM framework)
-- **langchain-openai**: 0.1.x (vLLM integration)
-
-### Data Stores
-- **PostgreSQL**: Platform CNPG cluster (relational data)
-- **Milvus**: Platform vector database (embeddings)
-- **Redis**: Optional cache (not yet deployed)
-
-### Production (Docker + Kubernetes)
-- **Base Image**: python:3.11-slim (multi-stage build)
-- **Build Time**: 5-10 minutes (ML dependencies)
-- **Image Size**: ~2-3 GB (includes PyTorch)
-- **Orchestration**: Kubernetes 1.34+
-- **Ingress**: nginx-ingress with Let's Encrypt DNS-01
+### 4. What should move TO srt-data-layer?
+- [ ] Any data ingestion pipelines?
+- [ ] Any scraper configurations?
+- [ ] Any embedding logic?
 
 ---
 
-## 📁 PROJECT STRUCTURE
+## Integration Requirements
+
+When this backend is deployed, it must use:
+
+### Platform Services (srt-hq-k8s)
+- **PostgreSQL**: CNPG cluster for relational data (users, builds)
+- **Artemis**: Proxy for frontend integration
+- **KEDA**: Auto-scaling based on load
+- **FluxCD**: GitOps deployment
+
+### Shared Data Layer (srt-data-layer)
+- **DO NOT** implement your own vector search
+- **DO NOT** implement your own embedding generation
+- **DO NOT** implement your own RAG
+- **INSTEAD** call srt-data-layer APIs for all knowledge base operations
+
+### Frontend Integration (myashes.ai)
+- All endpoints must be accessible via Artemis proxy
+- CORS must be configured for myashes.ai origin
+- Response formats must match frontend expectations
+
+---
+
+## Related Repositories
+
+| Resource | Location | Purpose |
+|----------|----------|---------|
+| **Frontend** | `/Users/shaun/repos/myashes.github.io/` | Live at myashes.ai |
+| **Data Layer** | `/Users/shaun/repos/srt-data-layer/` | RAG/vector platform |
+| **K8s Platform** | `/Users/shaun/repos/srt-hq-k8s/` | Infrastructure |
+| **Artemis** | `/Users/shaun/repos/srt-inference-proxy/` | API gateway |
+
+---
+
+## Project Structure
 
 ```
 ashes-of-creation-assistant/
-├── backend/                   # Backend application (THIS deployment)
-│   ├── app/                   # FastAPI application
-│   │   ├── api/               # API routes
-│   │   │   └── v1/            # API version 1
-│   │   ├── core/              # Core utilities
-│   │   ├── crud/              # Database operations
-│   │   ├── db/                # Database configuration
+├── backend/                   # FastAPI backend
+│   ├── app/
+│   │   ├── api/v1/            # API endpoints (REVIEW FOR REDUNDANCY)
+│   │   ├── services/          # Business logic (REVIEW FOR REDUNDANCY)
 │   │   ├── models/            # SQLAlchemy models
 │   │   ├── schemas/           # Pydantic schemas
-│   │   ├── services/          # Business logic
-│   │   ├── config.py          # Application settings
+│   │   ├── crud/              # Database operations
 │   │   └── main.py            # Application entry point
 │   ├── migrations/            # Alembic migrations
-│   ├── alembic.ini            # Alembic configuration
-│   ├── requirements.txt       # Python dependencies
-│   ├── Dockerfile             # Original docker-compose Dockerfile
-│   └── entrypoint.sh          # Original entrypoint (not used in K8s)
-├── frontend/                  # Next.js frontend (separate deployment)
-├── data-pipeline/             # Data scraping (not deployed)
-├── k8s/                       # K8s manifests (K8s deployment only)
-│   ├── 01-namespace.yaml
-│   ├── 02-configmap.yaml
-│   ├── 03-secret.yaml
-│   ├── 04-deployment.yaml
-│   ├── 05-service.yaml
-│   ├── 06-ingress.yaml
-│   └── 07-migration-job.yaml
-├── Dockerfile                 # K8s-optimized multi-stage build
-├── .dockerignore              # Docker build exclusions
-├── build-and-push.ps1         # Docker build script
-├── deploy.ps1                 # Kubernetes deployment
-├── CLAUDE.md                  # This file
-└── README-K8S.md              # Deployment documentation
-```
-
-**Note**: Files marked "K8s deployment only" are in the submodule but NOT in the standalone repository.
-
----
-
-## 🚀 DEVELOPMENT WORKFLOW
-
-### Local Development
-
-```bash
-# Install dependencies
-cd backend
-pip install -r requirements.txt
-
-# Set up environment variables
-export DATABASE_URL="postgresql://user:pass@localhost/myashes"
-export SECRET_KEY="your-secret-key"
-
-# Run migrations
-alembic upgrade head
-
-# Start dev server (with auto-reload)
-uvicorn app.main:app --reload
-# Access: http://localhost:8000
-# API Docs: http://localhost:8000/docs
-```
-
-### Docker Testing
-
-```bash
-# Build image locally
-.\build-and-push.ps1
-
-# Test image (requires external database)
-docker run --rm -p 8000:8000 \
-  -e DATABASE_URL="postgresql://..." \
-  -e SECRET_KEY="test-key" \
-  suparious/myashes-backend:latest
-# Access: http://localhost:8000/docs
-```
-
-### Production Deployment
-
-```powershell
-# Build and push to Docker Hub
-.\build-and-push.ps1 -Login -Push
-
-# Deploy to Kubernetes (includes migrations)
-.\deploy.ps1
-
-# Or build + push + deploy in one command
-.\deploy.ps1 -Build -Push
+│   └── requirements.txt       # Dependencies
+├── frontend/                  # Next.js (NOT USED - myashes.github.io instead)
+├── data-pipeline/             # Scrapers (REVIEW - may move to srt-data-layer)
+├── k8s/                       # K8s manifests (NEEDS KEDA + FluxCD update)
+├── Dockerfile
+└── CLAUDE.md                  # This file
 ```
 
 ---
 
-## 📋 DEPLOYMENT
+## Current State Assessment (NEEDS UPDATE)
 
-### Quick Deploy (Recommended)
+After discovery, update this section with findings:
 
-```powershell
-# Full deployment (build, push, deploy with migrations)
-.\deploy.ps1 -Build -Push
+### Services in this repo:
+| Service | Purpose | Status | Action |
+|---------|---------|--------|--------|
+| TBD | TBD | TBD | TBD |
 
-# Deploy only (uses existing Docker Hub image)
-.\deploy.ps1
+### Redundant with srt-data-layer:
+| Feature | This Repo | srt-data-layer | Decision |
+|---------|-----------|----------------|----------|
+| TBD | TBD | TBD | TBD |
 
-# Uninstall
-.\deploy.ps1 -Uninstall
-```
-
-### Manual Deployment
-
-```bash
-# Build and push Docker image
-docker build -t suparious/myashes-backend:latest .
-docker push suparious/myashes-backend:latest
-
-# Deploy to cluster
-kubectl apply -f k8s/01-namespace.yaml
-kubectl apply -f k8s/02-configmap.yaml
-kubectl apply -f k8s/03-secret.yaml  # UPDATE SECRETS FIRST!
-
-# Run migrations
-kubectl apply -f k8s/07-migration-job.yaml
-kubectl wait --for=condition=complete --timeout=300s job/myashes-db-migration -n myashes-backend
-
-# Deploy application
-kubectl apply -f k8s/04-deployment.yaml
-kubectl apply -f k8s/05-service.yaml
-kubectl apply -f k8s/06-ingress.yaml
-
-# Verify deployment
-kubectl get all -n myashes-backend
-kubectl get certificate -n myashes-backend
-```
+### Still Needed:
+| Feature | Priority | Notes |
+|---------|----------|-------|
+| TBD | TBD | TBD |
 
 ---
 
-## 🔧 COMMON TASKS
+## Deployment Requirements (Post-Refactoring)
 
-### View Logs
+Once refactoring is complete, deployment must include:
 
-```bash
-# Application logs
-kubectl logs -n myashes-backend -l app=myashes-backend -f
-
-# Migration logs
-kubectl logs -n myashes-backend -l component=migration
-
-# Specific pod
-kubectl logs -n myashes-backend <pod-name> -f
+### KEDA Scaling
+```yaml
+# Example KEDA ScaledObject (to be created)
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: myashes-backend
+  namespace: myashes-backend
+spec:
+  scaleTargetRef:
+    name: myashes-backend
+  minReplicaCount: 0
+  maxReplicaCount: 10
+  triggers:
+    - type: prometheus
+      # TBD: Define scaling metrics
 ```
 
-### Database Operations
+### FluxCD Deployment
+- Manifests should be in srt-hq-k8s GitOps structure
+- Kustomization for environment overlays
+- Image automation for Docker Hub updates
 
-```bash
-# Connect to PostgreSQL
-kubectl cnpg psql postgres-cluster postgres-system
-
-# Create database (first-time setup)
-CREATE DATABASE myashes;
-
-# Grant permissions
-GRANT ALL PRIVILEGES ON DATABASE myashes TO myashes;
-
-# List databases
-\l
-
-# Connect to myashes database
-\c myashes
-```
-
-### Run Migrations
-
-```bash
-# Delete old migration job
-kubectl delete job myashes-db-migration -n myashes-backend
-
-# Run new migration
-kubectl apply -f k8s/07-migration-job.yaml
-kubectl wait --for=condition=complete --timeout=300s job/myashes-db-migration -n myashes-backend
-
-# Check migration status
-kubectl logs -n myashes-backend -l component=migration
-```
-
-### Update Deployment
-
-```bash
-# Restart pods (pull latest image)
-kubectl rollout restart deployment/myashes-backend -n myashes-backend
-
-# Watch rollout status
-kubectl rollout status deployment/myashes-backend -n myashes-backend
-
-# Check deployment history
-kubectl rollout history deployment/myashes-backend -n myashes-backend
-```
-
-### Update Secrets
-
-```bash
-# Create/update secret
-kubectl create secret generic myashes-backend-secrets \
-  -n myashes-backend \
-  --from-literal=POSTGRES_USER=myashes \
-  --from-literal=POSTGRES_PASSWORD='your-password' \
-  --from-literal=SECRET_KEY='your-secret-key' \
-  --from-literal=OPENAI_API_BASE='https://vllm.lab.hq.solidrust.net/v1' \
-  --dry-run=client -o yaml | kubectl apply -f -
-
-# Restart deployment to pick up new secrets
-kubectl rollout restart deployment/myashes-backend -n myashes-backend
-```
+### Artemis Integration
+- Register endpoints with Artemis proxy
+- Configure CORS for myashes.ai
+- Set up health checks
 
 ---
 
-## 🎯 USER PREFERENCES (CRITICAL)
+## User Preferences (CRITICAL)
 
-### Solutions
-- ✅ **Complete, working solutions** - Every change must be immediately deployable
-- ✅ **Direct execution** - Use available tools, verify in real-time
-- ✅ **No back-and-forth** - Show results, iterate to solution
-- ❌ **NO workarounds** - If symptoms remain, keep digging for root cause
-- ❌ **NO temporary files** - All code is production code
-- ❌ **NO disabled functionality** - Don't hack around errors, fix them
-- ✅ **Git as source of truth** - All changes in code, nothing manual
+### Shaun's Rules
+- ✅ **Complete, working solutions** - Every change must be deployable
+- ✅ **No workarounds** - Fix root causes, not symptoms
+- ✅ **Git as source of truth** - All changes in code
+- ✅ **Documentation first** - Update CLAUDE.md with findings
+- ❌ **NO temporary fixes**
+- ❌ **NO disabled functionality**
 
-### Code Quality
-- Full files, never patch fragments (unless part of strategy)
-- Scripts work on first run (no retry logic needed)
-- Documentation before infrastructure
-- Reproducibility via automation
-
----
-
-## 💡 KEY DECISIONS
-
-### Why Backend-Only Deployment?
-- Frontend is static Next.js site (better on GitHub Pages + CDN)
-- Backend needs K8s for database integration, scaling, monitoring
-- Separation allows independent scaling and deployment
-- Frontend can be served globally via Cloudflare CDN
-
-### Why Platform PostgreSQL (CNPG)?
-- Already deployed and managed
-- High availability with automatic failover
-- Automated backups
-- No need for separate database deployment
-
-### Why Platform Milvus?
-- Centralized vector database for all platform AI workloads
-- Shared infrastructure reduces complexity
-- Better resource utilization
-
-### Why Init Container for Database Wait?
-- K8s best practice vs. entrypoint wait logic
-- Cleaner separation of concerns
-- Better visibility in pod status
-
-### Why Separate Migration Job?
-- Migrations need to run ONCE before deployment
-- Avoid race conditions with multiple replicas
-- Better control and observability
-- Can be re-run independently
-
-### Why 2 Replicas?
-- High availability for API backend
-- Load distribution
-- Zero-downtime deployments
-- Balance between HA and resource usage
+### Agent Behavior
+- Run discovery FIRST in any new session
+- Update this CLAUDE.md with findings
+- Coordinate with myashes.github.io agent on API contracts
+- Check srt-data-layer before implementing any data features
 
 ---
 
-## 🔍 VALIDATION
+## Session Workflow
 
-### After Deployment
+### First Session (Discovery)
+1. Read this entire CLAUDE.md
+2. Explore `backend/app/` to understand what exists
+3. Compare with srt-data-layer capabilities
+4. Update "Current State Assessment" section above
+5. Identify redundant vs needed services
+6. Propose refactoring plan
 
-```bash
-# 1. Check pods are running
-kubectl get pods -n myashes-backend
-# Expected: 2/2 pods Running
-
-# 2. Check migration completed
-kubectl get jobs -n myashes-backend
-# Expected: myashes-db-migration COMPLETIONS=1/1
-
-# 3. Check service
-kubectl get svc -n myashes-backend
-# Expected: ClusterIP service on port 80
-
-# 4. Check ingress
-kubectl get ingress -n myashes-backend
-# Expected: myashes-backend.lab.hq.solidrust.net with ADDRESS
-
-# 5. Check certificate
-kubectl get certificate -n myashes-backend
-# Expected: READY=True (may take 1-2 minutes)
-
-# 6. Test health endpoint
-curl -k https://myashes-backend.lab.hq.solidrust.net/health
-# Expected: {"status":"healthy"}
-
-# 7. Test API docs
-# Open https://myashes-backend.lab.hq.solidrust.net/docs
-# Expected: Swagger UI loads
-
-# 8. Check database
-kubectl cnpg psql postgres-cluster postgres-system
-\c myashes
-\dt
-# Expected: Tables created by migrations
-```
+### Subsequent Sessions
+1. Read this CLAUDE.md (will have discovery findings)
+2. Continue refactoring based on plan
+3. Update manifests for KEDA + FluxCD
+4. Test integration with srt-data-layer
+5. Coordinate API contracts with frontend agent
 
 ---
 
-## 🔐 SECURITY CONSIDERATIONS
-
-### Secrets Management
-- ⚠️ **CRITICAL**: Update secrets before production use
-- Default secrets in k8s/03-secret.yaml are templates only
-- Use strong passwords for PostgreSQL
-- Generate JWT secret with: `openssl rand -hex 32`
-- Store sensitive API keys in secrets, not configmaps
-
-### Database Security
-- Backend connects to PostgreSQL with service account credentials
-- User `myashes` has access ONLY to `myashes` database
-- No superuser access from application
-- Credentials stored in Kubernetes secrets
-
-### API Security
-- JWT-based authentication
-- CORS enabled for specific origins only
-- HTTPS enforced via ingress
-- Rate limiting (TODO: implement)
-
----
-
-## 🎓 AGENT SUCCESS CRITERIA
-
-You're doing well if:
-
-✅ You understand this is backend-only deployment (frontend separate)
-✅ You know it integrates with platform PostgreSQL and Milvus
-✅ You understand migration job runs before deployment
-✅ You reference srt-hq-k8s for platform questions
-✅ You provide complete solutions (never workarounds)
-✅ You use PowerShell scripts for deployment
-✅ You validate changes work end-to-end
-✅ You remember this is a game assistant backend (not the game itself)
-✅ You check requirements.txt for Python dependencies
-✅ You respect Shaun's "no workarounds" philosophy
-
----
-
-## 📅 CHANGE HISTORY
+## Change History
 
 | Date | Change | Impact |
 |------|--------|--------|
-| 2025-12-31 | AI chat LIVE on landing page | myashes.ai now has working chat via Artemis vLLM |
-| 2025-12-31 | CORS enabled on Artemis | Frontend can call vLLM API directly |
-| 2025-12-30 | Landing page live | myashes.ai deployed via SolidRusT/myashes.github.io |
-| 2025-12-30 | Updated paths to macOS | Migrated from WSL to native macOS |
-| 2025-11-12 | Initial onboarding | Backend added to SRT-HQ K8s platform |
-| 2025-11-12 | Created K8s Dockerfile | Multi-stage build optimized for K8s |
-| 2025-11-12 | Created K8s manifests | Deployment with ConfigMap, Secret, Migration Job |
-| 2025-11-12 | Created PowerShell scripts | build-and-push.ps1, deploy.ps1 |
-| 2025-11-12 | Added as git submodule | Integrated into srt-hq-k8s repo |
+| 2026-01-14 | CLAUDE.md rewritten for discovery | Agent now understands platform integration needs |
+| 2025-12-31 | AI chat LIVE on myashes.ai | Frontend working without this backend |
+| 2025-11-12 | Initial K8s manifests | Created but never deployed |
 
 ---
 
-**Last Updated**: 2025-12-31
-**Status**: K8s Deployment Ready (Backend Only)
-**Platform**: SRT-HQ Kubernetes
-**Access**: https://myashes-backend.lab.hq.solidrust.net
+**Last Updated**: 2026-01-14
+**Status**: NEEDS DISCOVERY & REFACTORING
+**Next Step**: Run discovery, update this file with findings
 
 ---
 
-*Attach this file to MyAshes.ai Backend conversations for complete context.*
+*This is a PUBLIC repository for community collaboration. Sensitive platform details are in private repos.*
