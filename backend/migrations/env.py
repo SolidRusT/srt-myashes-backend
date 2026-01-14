@@ -11,8 +11,10 @@ from alembic import context
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 # Import Base and all models to ensure they're registered with SQLAlchemy
-from app.db.base_class import Base
-from app.models.user import User, UserPreference, SavedItem
+from app.db.base import Base  # This imports all models
+from app.models.build import Build, BuildVote
+from app.models.feedback import Feedback
+from app.models.analytics import SearchAnalytics
 
 # Import application config
 from app.core.config import settings

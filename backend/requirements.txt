@@ -1,53 +1,25 @@
 # Web framework
-fastapi>=0.104.1,<0.110.0
-uvicorn>=0.24.0,<0.30.0
-pydantic>=2.0.0,<2.7.0  # Compatible with langchain 0.2.x
-pydantic-settings>=2.0.3,<2.2.0
+fastapi>=0.104.1,<0.115.0
+uvicorn>=0.24.0,<0.35.0
+pydantic>=2.0.0,<3.0.0
+pydantic-settings>=2.0.3,<3.0.0
 
 # Database
 sqlalchemy>=2.0.23,<2.1.0
-alembic>=1.13.1,<1.14.0
+alembic>=1.13.1,<1.15.0
 psycopg2-binary>=2.9.9,<2.10.0
 
-# Authentication
-python-jose[cryptography]>=3.3.0,<3.4.0
-passlib[bcrypt]>=1.7.4,<1.8.0
-python-multipart>=0.0.6,<0.0.19
-email-validator>=2.1.0,<2.2.0
-
-# Vector database
-pymilvus>=2.3.0,<2.4.0
-marshmallow>=3.13.0,<4.0.0  # Pin to 3.x for environs compatibility
-
-# Cache
+# Cache + Rate limiting
 redis>=5.0.1,<6.0.0
 
-# HTTP client
-httpx>=0.25.1,<0.27.0
+# HTTP client (for any external API calls)
+httpx>=0.25.1,<0.28.0
 
 # Environment variables
 python-dotenv>=1.0.0,<2.0.0
 
-# Machine learning
-sentence-transformers>=2.7.0  # Updated for huggingface_hub compatibility
-langchain>=0.2.0,<0.3.0  # Updated to a more compatible version
-langchain-openai>=0.1.0,<0.2.0  # Updated to be compatible with langchain 0.2.x
-
-# Image processing
-pillow>=11.1.0,<11.2.0
-
-# Data processing
-numpy>=1.26.1,<1.27.0
-pandas>=2.1.2,<2.2.0
-
-# Deep learning (compatible versions)
-torch==2.8.0
-torchvision==0.19.0
-torchaudio==2.4.0
-
-# Discord bot
-discord.py>=2.3.2,<2.4.0
-
 # Utilities
-tenacity>=8.2.3,<8.3.0
 loguru>=0.7.2,<0.8.0
+
+# Rate limiting (to be added in Phase 5)
+# slowapi>=0.1.9,<0.2.0
