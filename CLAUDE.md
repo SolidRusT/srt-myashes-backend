@@ -91,6 +91,16 @@ This repo provides **product-specific backend services** for MyAshes.ai:
 - **Location**: `/api/*` with CORS for myashes.ai
 - **Headers**: `X-Session-ID` exposed in CORS
 
+### Observability
+- **Prometheus**: `/metrics` endpoint via `prometheus-fastapi-instrumentator`
+- **ServiceMonitor**: `myashes-backend` in `monitoring` namespace (srt-hq-k8s)
+- **Metrics collected**:
+  - `http_requests_total` - Request count by method/status/handler
+  - `http_request_duration_seconds` - Latency histogram
+  - `http_request_size_bytes` / `http_response_size_bytes`
+  - `myashes_http_requests_inprogress` - Active requests gauge
+  - Python runtime metrics (GC, process memory, CPU)
+
 ---
 
 ## Project Structure (Current)
@@ -143,8 +153,18 @@ ashes-of-creation-assistant/
 │   └── 08-keda-scaledobject.yaml
 ├── .github/workflows/
 │   └── ci-cd.yml                 # Backend-only CI (lint, test, build)
-├── data-pipeline/                # TO MIGRATE to srt-data-layer
-└── CLAUDE.md                     # This file
+├── data-pipeline/                # TO MIGRATE to srt-data-layer (Phase 8)
+├── CLAUDE.md                     # This file (source of truth)
+│
+│   LEGACY (can be deleted):
+├── frontend/                     # Old Next.js app - replaced by myashes.github.io
+├── docker/                       # Old Docker Compose setup
+├── nginx/                        # Old nginx config
+├── scripts/                      # Old deployment scripts
+├── CUSTOM_INSTRUCTIONS.md        # Outdated - superseded by CLAUDE.md
+├── README.md                     # Outdated general README
+├── README-K8S.md                 # Outdated K8s docs
+└── *.ps1, *.sh (root)            # Old Windows/Linux deployment scripts
 ```
 
 ---
@@ -223,13 +243,15 @@ ashes-of-creation-assistant/
 | 4 | Analytics API | ✅ COMPLETE |
 | 6 | Database + Config | ✅ COMPLETE |
 | 7 | K8s Deployment + Artemis | ✅ COMPLETE |
+| - | Prometheus observability | ✅ COMPLETE |
 
 ### Remaining Work
 
-| Phase | Description | Priority |
-|-------|-------------|----------|
-| 5 | Rate limiting | LOW - can add later |
-| 8 | AoC connector migration | SEPARATE EFFORT |
+| Phase | Description | Priority | Notes |
+|-------|-------------|----------|-------|
+| 5 | Rate limiting | LOW | Add if abuse detected (slowapi or Redis-based) |
+| 8 | AoC connector migration | SEPARATE | Move data-pipeline/ scrapers to srt-data-layer |
+| - | Legacy cleanup | LOW | Delete old frontend/, docker/, nginx/, scripts/ |
 
 ---
 
@@ -323,6 +345,7 @@ kubectl exec -it platform-postgres-3 -n data-platform -- psql -U postgres -d mya
 
 | Date | Change | Impact |
 |------|--------|--------|
+| 2026-01-14 | Prometheus metrics added | Full observability via Grafana |
 | 2026-01-14 | **DEPLOYED TO K8S** | All endpoints live via Artemis |
 | 2026-01-14 | Phase 7 complete | K8s deployment, Artemis routing, DB permissions |
 | 2026-01-14 | Phase 4 complete | Analytics API (search recording, popular queries) |
@@ -334,8 +357,8 @@ kubectl exec -it platform-postgres-3 -n data-platform -- psql -U postgres -d mya
 ---
 
 **Last Updated**: 2026-01-14
-**Status**: DEPLOYED AND LIVE
-**Next Steps**: Frontend integration testing, then Phase 5 (rate limiting) if needed
+**Status**: DEPLOYED AND LIVE with full observability
+**Next Steps**: Monitor frontend integration, cleanup legacy code when ready
 
 ---
 

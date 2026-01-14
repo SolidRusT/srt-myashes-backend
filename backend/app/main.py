@@ -8,6 +8,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import ValidationError as PydanticValidationError
+from prometheus_fastapi_instrumentator import Instrumentator
 import logging
 
 from app.api.v1 import api_router
@@ -31,6 +32,18 @@ app = FastAPI(
     redoc_url="/redoc" if settings.DEBUG else None,
     debug=settings.DEBUG
 )
+
+# Initialize Prometheus metrics instrumentator
+instrumentator = Instrumentator(
+    should_group_status_codes=False,
+    should_ignore_untemplated=True,
+    should_respect_env_var=False,
+    should_instrument_requests_inprogress=True,
+    excluded_handlers=["/health", "/metrics"],
+    inprogress_name="myashes_http_requests_inprogress",
+    inprogress_labels=True,
+)
+instrumentator.instrument(app).expose(app, endpoint="/metrics", include_in_schema=False)
 
 # Add session middleware (must be added before CORS)
 app.add_middleware(SessionMiddleware)
