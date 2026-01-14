@@ -1,7 +1,7 @@
 # CLAUDE.md - Ashes of Creation Assistant Backend
 
 **Project**: Community backend for Ashes of Creation game assistant
-**Status**: DEPLOYED AND LIVE - All Phase 1-7 Complete
+**Status**: v2.0 DEPLOYED AND LIVE
 **Visibility**: PUBLIC (community collaboration)
 **Last Updated**: 2026-01-14
 **Shaun's Golden Rule**: **No workarounds, no temporary fixes, no disabled functionality. Full solutions only.**
@@ -231,27 +231,41 @@ ashes-of-creation-assistant/
 
 ---
 
-## Implementation Status
+## Current Status
 
-### Completed Phases
+**Backend v2.0 is COMPLETE and LIVE.** All core functionality deployed and monitored.
+
+### Backlog
+
+| Item | Priority | Notes |
+|------|----------|-------|
+| Rate limiting | LOW | Add slowapi or Redis-based limiting if abuse detected |
+| AoC data connector | SEPARATE | Migrate data-pipeline/ scrapers to srt-data-layer |
+| Legacy cleanup | LOW | Delete old frontend/, docker/, nginx/, scripts/ |
+
+### Ideas for Future Work
+
+_To be populated during research phase_
+
+---
+
+## Archive: Initial Implementation (2026-01-14)
+
+<details>
+<summary>Click to expand completed phases</summary>
 
 | Phase | Description | Status |
 |-------|-------------|--------|
-| 1 | Delete redundant code | ✅ COMPLETE |
+| 1 | Delete redundant code (15 files) | ✅ COMPLETE |
 | 2 | Builds API (CRUD + voting) | ✅ COMPLETE |
 | 3 | Feedback API | ✅ COMPLETE |
 | 4 | Analytics API | ✅ COMPLETE |
+| 5 | Rate limiting | ⏸️ SKIPPED (low priority) |
 | 6 | Database + Config | ✅ COMPLETE |
 | 7 | K8s Deployment + Artemis | ✅ COMPLETE |
 | - | Prometheus observability | ✅ COMPLETE |
 
-### Remaining Work
-
-| Phase | Description | Priority | Notes |
-|-------|-------------|----------|-------|
-| 5 | Rate limiting | LOW | Add if abuse detected (slowapi or Redis-based) |
-| 8 | AoC connector migration | SEPARATE | Move data-pipeline/ scrapers to srt-data-layer |
-| - | Legacy cleanup | LOW | Delete old frontend/, docker/, nginx/, scripts/ |
+</details>
 
 ---
 
@@ -345,20 +359,16 @@ kubectl exec -it platform-postgres-3 -n data-platform -- psql -U postgres -d mya
 
 | Date | Change | Impact |
 |------|--------|--------|
+| 2026-01-14 | **v2.0 COMPLETE** | Archived initial implementation, docs cleanup |
 | 2026-01-14 | Prometheus metrics added | Full observability via Grafana |
-| 2026-01-14 | **DEPLOYED TO K8S** | All endpoints live via Artemis |
-| 2026-01-14 | Phase 7 complete | K8s deployment, Artemis routing, DB permissions |
-| 2026-01-14 | Phase 4 complete | Analytics API (search recording, popular queries) |
-| 2026-01-14 | Phase 3 complete | Feedback API (thumbs up/down) |
-| 2026-01-14 | Phase 2 complete | Builds API (CRUD + voting) |
-| 2026-01-14 | Phase 1 complete | Deleted redundant code (15 files) |
-| 2026-01-14 | Discovery complete | Identified refactoring needs |
+| 2026-01-14 | K8s deployment complete | All endpoints live via Artemis |
+| 2026-01-14 | Initial implementation | Builds, Feedback, Analytics APIs |
 
 ---
 
 **Last Updated**: 2026-01-14
-**Status**: DEPLOYED AND LIVE with full observability
-**Next Steps**: Monitor frontend integration, cleanup legacy code when ready
+**Status**: v2.0 DEPLOYED AND LIVE with full observability
+**Next Steps**: Research new features, groom backlog, create next implementation plan
 
 ---
 

@@ -1,150 +1,68 @@
-# MyAshes.ai - AI-Powered Assistant for Ashes of Creation
+# MyAshes.ai Backend
 
-MyAshes.ai is a comprehensive AI-powered companion app for the MMORPG game Ashes of Creation. The application provides a chat interface, character build planner, item database, crafting calculator, resource map, and more to help players optimize their gameplay experience.
+Backend API for [MyAshes.ai](https://myashes.ai) - an AI-powered assistant for Ashes of Creation.
 
-## Features
+## What This Repo Provides
 
-- **AI Assistant**: Chat with an AI that understands game mechanics and can answer questions about Ashes of Creation
-- **Character Build Planner**: Create, save, and share character builds
-- **Item Database**: Search and explore all items in the game
-- **Crafting Calculator**: Plan your crafting activities and calculate costs
-- **Resource Map**: Find gathering locations for resources
-- **Economy Tracker**: Monitor server economies and track resource prices
-- **Discord Bot Integration**: Access all the features directly from Discord
+Product-specific backend services for the MyAshes.ai community platform:
+
+- **Build Sharing** - Create, share, and vote on character builds
+- **Feedback Collection** - Thumbs up/down on AI responses
+- **Search Analytics** - Track popular queries and search patterns
 
 ## Architecture
 
-The application consists of several components:
+```
+myashes.ai (GitHub Pages)
+    │
+    ▼
+Artemis Proxy (artemis.hq.solidrust.net)
+    │
+    ├── /data/* → srt-data-layer (AI chat, vector search)
+    └── /api/*  → THIS BACKEND (builds, feedback, analytics)
+```
 
-1. **Frontend**: Next.js, React, TypeScript, and Tailwind CSS
-2. **Backend API**: Python FastAPI
-3. **Data Pipeline**: Python scrapers and vector indexing
-4. **Discord Bot**: Python-based bot integration
-5. **Authentication System**: JWT-based user authentication
-6. **Vector Store**: Milvus for semantic search
+The AI chat functionality is provided by [srt-data-layer](https://github.com/SolidRusT/srt-data-layer),
+a shared platform service. This repo only handles the MyAshes-specific features.
 
-## Getting Started
+## API Endpoints
 
-### Prerequisites
+| Endpoint | Description |
+|----------|-------------|
+| `GET/POST /api/v1/builds` | List and create builds |
+| `GET/PATCH/DELETE /api/v1/builds/{id}` | Get, update, delete build |
+| `POST /api/v1/builds/{id}/vote` | Vote on a build (1-5) |
+| `POST /api/v1/feedback` | Submit AI response feedback |
+| `POST /api/v1/analytics/search` | Record search query |
+| `GET /api/v1/analytics/popular-queries` | Get trending queries |
 
-- Docker and Docker Compose
-- Node.js 18+ (for local frontend development)
-- Python 3.10+ (for local backend development)
-- OpenAI API key
+## Deployment
 
-### Installation
+This backend runs on Kubernetes with:
+- 6 replicas auto-scaled via KEDA
+- PostgreSQL for persistence
+- Valkey for caching
+- Prometheus metrics at `/metrics`
 
-1. Clone the repository:
-
-   ```bash
-   git clone git@github.com:SolidRusT/ashes-of-creation-assistant.git
-   cd ashes-of-creation-assistant
-   ```
-
-2. Create a `.env` file based on the example:
-
-   ```bash
-   cp docker/.env.example docker/.env
-   ```
-
-3. Update the `.env` file with your configuration:
-   - Set your OpenAI API key
-   - Configure database credentials
-   - Set other environment variables as needed
-
-4. Start the application with Docker Compose:
-
-   ```bash
-   cd docker
-   docker-compose up -d
-   ```
-
-5. Access the application:
-   - Frontend: http://localhost:3000
-   - Backend API: http://localhost:8000
-   - API Documentation: http://localhost:8000/docs
+See [CLAUDE.md](CLAUDE.md) for detailed technical documentation.
 
 ## Development
 
-### Frontend Development
-
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-The frontend will be available at http://localhost:3000.
-
-### Backend Development
-
 ```bash
 cd backend
+python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 uvicorn app.main:app --reload
 ```
 
-The backend API will be available at http://localhost:8000.
+## Related Repos
 
-### Database Migrations
-
-```bash
-cd backend
-alembic upgrade head  # Apply all migrations
-alembic revision --autogenerate -m "Description"  # Create a new migration
-```
-
-## Authentication System
-
-The application uses a JWT-based authentication system:
-
-1. **Registration**: Create an account with email, username, and password
-2. **Login**: Authenticate and receive a JWT token
-3. **Password Reset**: Request a password reset link via email
-4. **Profile Management**: Update profile information and preferences
-
-### JWT Security
-
-- Access tokens expire after 60 minutes
-- Password reset tokens expire after 24 hours
-- All endpoints requiring authentication use Bearer token scheme
-
-## Deployment
-
-### Production Deployment
-
-1. Update the production configuration in `docker/docker-compose.prod.yml`
-2. Deploy using the provided CI/CD workflow or manually:
-
-   ```bash
-   ./scripts/deployment/deploy.sh production
-   ```
-
-### Staging Deployment
-
-```bash
-./scripts/deployment/deploy.sh staging
-```
-
-## Monitoring and Maintenance
-
-- Monitoring is set up using Prometheus and Grafana
-- Database backups run daily and are stored in S3
-- Log files are rotated and monitored
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add some amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+| Repo | Purpose |
+|------|---------|
+| [myashes.github.io](https://github.com/myashes/myashes.github.io) | Frontend (live at myashes.ai) |
+| [srt-data-layer](https://github.com/SolidRusT/srt-data-layer) | AI/RAG platform |
+| [srt-hq-k8s](https://github.com/SolidRusT/srt-hq-k8s) | K8s infrastructure |
 
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details. All intellectual property and assets related to Ashes of Creation are reserved by Intrepid Studios. This site is fan-made and not affiliated with Ashes of Creation or Intrepid Studios.
-
-## Acknowledgments
-
-- The Ashes of Creation community for their contributions and feedback
-- Intrepid Studios for creating Ashes of Creation
+MIT License. Ashes of Creation is a trademark of Intrepid Studios. This is a fan project.
