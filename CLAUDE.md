@@ -1,7 +1,7 @@
 # CLAUDE.md - Ashes of Creation Assistant Backend
 
 **Project**: Community backend for Ashes of Creation game assistant
-**Status**: Phase 4 COMPLETE - All APIs implemented, ready for deployment
+**Status**: DEPLOYED AND LIVE - All Phase 1-7 Complete
 **Visibility**: PUBLIC (community collaboration)
 **Last Updated**: 2026-01-14
 **Shaun's Golden Rule**: **No workarounds, no temporary fixes, no disabled functionality. Full solutions only.**
@@ -10,178 +10,284 @@
 
 ## CRITICAL: READ THIS FIRST
 
-**Phase 1 completed 2026-01-14.** Codebase cleaned, ready for feature implementation.
+**Backend is LIVE as of 2026-01-14.** All core APIs deployed and working via Artemis.
 
 This repo provides **product-specific backend services** for MyAshes.ai:
-- **PROVIDES**: Build persistence, voting, feedback collection, search analytics
-- **DELETED**: Chat/RAG, vector store, embeddings, LLM service, JWT auth, Discord bot
-- **PENDING**: Data pipeline scrapers → srt-data-layer as AoC connector
+- **LIVE**: Build persistence, voting, feedback collection, search analytics
+- **DELETED**: Chat/RAG, vector store, embeddings, LLM service, JWT auth
+- **PENDING**: Rate limiting (Phase 5), AoC data connector migration (Phase 8)
 
-**Frontend Requirements Document**: `/Users/shaun/repos/myashes.github.io/docs/BACKEND-REQUIREMENTS.md`
+**Live Endpoints** (via `https://artemis.hq.solidrust.net`):
+- `GET/POST /api/v1/builds` - Build CRUD
+- `DELETE /api/v1/builds/{id}` - Delete build (owner only)
+- `POST /api/v1/builds/{id}/vote` - Vote 1-5
+- `POST /api/v1/feedback` - AI response feedback
+- `POST /api/v1/analytics/search` - Record search
+- `GET /api/v1/analytics/popular-queries` - Popular queries
 
-The platform provides via **srt-data-layer** (routed via `/data/*`):
-- `/data/v1/agent/chat` - Chat with tool-calling and RAG
-- `/data/v1/query/semantic` - Vector search via Milvus
-- `/data/v1/query/keyword` - Full-text search via MeiliSearch
-- `/data/v1/query/knowledge-graph` - Neo4j entity queries
-- `/data/v1/connectors/*` - Data ingestion infrastructure
+**Frontend uses srt-data-layer directly** (routed via `/data/*`):
+- `/data/v1/agent/chat` - Chat with RAG
+- `/data/v1/query/semantic` - Vector search
+- `/data/v1/query/keyword` - Keyword search
 
 ---
 
-## Strategic Context (Post-Refactoring)
+## Architecture (DEPLOYED)
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │  myashes.ai (Frontend)                                       │
 │  - Static site on GitHub Pages                               │
 │  - Uses ES6 modules, localStorage for client state           │
-│  - Already LIVE with AI chat via Artemis                     │
+│  - LIVE with AI chat + build sharing                         │
 └──────────────────────┬──────────────────────────────────────┘
                        │
                        ▼
 ┌─────────────────────────────────────────────────────────────┐
 │  Artemis Proxy (https://artemis.hq.solidrust.net)           │
-│  - Routes /data/* → srt-data-layer (generic platform)       │
-│  - Routes /api/*  → ashes-of-creation-assistant (product)   │
-│  - Handles CORS for myashes.ai                               │
+│  - Routes /data/* → srt-data-layer                          │
+│  - Routes /api/*  → THIS BACKEND ✅ CONFIGURED              │
+│  - CORS for myashes.ai + X-Session-ID header                │
 └──────────────────────┬──────────────────────────────────────┘
                        │
          ┌─────────────┴─────────────┐
          ▼                           ▼
 ┌─────────────────────┐   ┌─────────────────────────────────┐
-│  srt-data-layer     │   │  THIS REPO (refactored)         │
-│  (Shared Platform)  │   │  (Product-Specific Backend)     │
-│  ✅ DEPLOYED        │   │  ⚠️ IMPLEMENTATION IN PROGRESS  │
-│                     │   │                                 │
-│  Already provides:  │   │  Will provide:                  │
-│  - /data/v1/query/* │   │  - /api/v1/builds/*             │
-│  - /data/v1/ingest/*│   │  - /api/v1/feedback/*           │
+│  srt-data-layer     │   │  THIS REPO                      │
+│  (Shared Platform)  │   │  ✅ DEPLOYED TO K8S             │
+│  ✅ DEPLOYED        │   │                                 │
+│                     │   │  Live endpoints:                │
+│  Already provides:  │   │  - /api/v1/builds/*             │
+│  - /data/v1/query/* │   │  - /api/v1/feedback             │
 │  - /data/v1/agent/* │   │  - /api/v1/analytics/*          │
-│  - Vector search    │   │  - Session management           │
-│  - Knowledge graph  │   │  - Build persistence + voting   │
-│    └─ AoC connector │   │                                 │
-│       (TO BE ADDED) │   │  PostgreSQL-backed              │
-└─────────────────────┘   └─────────────────────────────────┘
+│  - Vector search    │   │                                 │
+│  - Knowledge graph  │   │  6 pods running                 │
+└─────────────────────┘   │  PostgreSQL: platform-postgres  │
+                          │  Cache: Valkey                  │
+                          └─────────────────────────────────┘
 ```
 
 ---
 
-## Discovery Checklist (COMPLETED 2026-01-14)
+## Deployment Details
 
-### 1. What does this repo currently provide?
-- [x] **API Endpoints** (`backend/app/api/v1/`):
-  - `auth/router.py` - JWT auth: register, login, refresh, password reset
-  - `users/router.py` - Profile, preferences, subscription management
-  - `builds.py` - Character build CRUD, archetypes, classes, races (uses vector_store)
-  - `chat.py` - Chat completions with RAG context (uses vector_store + LLM service)
-  - `items.py` - Item database search (uses vector_store)
-  - `crafting.py` - Recipes, professions, crafting calculator (uses vector_store)
-  - `servers.py` - Game server status, economy data
-  - `locations.py` - Zones, resources, POIs (uses vector_store)
+### Kubernetes Resources
+- **Namespace**: `myashes-backend`
+- **Deployment**: 6 replicas, auto-scaling via KEDA (0-10)
+- **Image**: `poseidon.hq.solidrust.net:30008/shaun/myashes-backend:latest`
+- **Registry Secret**: `gitea-registry` (for Gitea container registry)
 
-- [x] **Services** (`backend/app/services/`):
-  - `vector_store.py` - Own Milvus connection + SentenceTransformer embeddings ❌ REDUNDANT
-  - `llm_service.py` - OpenAI-compatible API with RAG ❌ REDUNDANT
-  - `cache_service.py` - Redis caching ✅ KEEP (for user sessions)
-  - `email.py` - SMTP email service ✅ KEEP
+### Database
+- **Host**: `platform-postgres-rw.data-platform.svc.cluster.local`
+- **Database**: `myashes`
+- **User**: `myashes`
+- **Tables**: `builds`, `build_votes`, `feedback`, `search_analytics`, `alembic_version`
 
-- [x] **Database Models** (`backend/app/models/`):
-  - `User` - email, username, premium status, created_at ✅ KEEP
-  - `UserPreference` - notifications, UI settings ✅ KEEP
-  - `SavedItem` - user's favorited game items ✅ KEEP
-  - `Build` - character builds (JSON data in PostgreSQL) ✅ KEEP
+### Cache
+- **Host**: `valkey.data-platform.svc.cluster.local:6379`
 
-- [x] **Data Pipeline** (`data-pipeline/`):
-  - Wiki scraper (ashesofcreation.wiki) using Playwright
-  - Codex scraper
-  - Official website scraper
-  - Game files processor
-  - Vector indexer with SentenceTransformer
-  - Chunk processor
-  - → **MIGRATE** to srt-data-layer as AoC connector
-
-### 2. What's now handled by srt-data-layer?
-- [x] **Vector search** - `/v1/query/semantic` with Milvus + BAAI/bge-m3 embeddings
-- [x] **Keyword search** - `/v1/query/keyword` with MeiliSearch
-- [x] **RAG chat** - `/v1/agent/chat` with tool-calling via srt-tool-agents-lite
-- [x] **Knowledge graph** - `/v1/query/knowledge-graph` with Neo4j
-- [x] **Embedding generation** - vLLM embeddings service (centralized)
-- [x] **Data ingestion** - `/v1/ingest/*` with deduplication, chunking
-- [x] **Data hygiene** - `/v1/hygiene/*` for dedup and cleanup
-
-### 3. What's still needed from this repo? (REVISED per frontend requirements)
-- [ ] ~~**User authentication**~~ - ❌ NOT NEEDED Phase 1 (session-based instead)
-- [ ] ~~**User accounts**~~ - ❌ NOT NEEDED Phase 1 (OAuth Phase 2)
-- [x] **Build persistence** - PostgreSQL CRUD with voting ✅ REQUIRED
-- [x] **Build sharing** - Public builds with share URLs ✅ REQUIRED
-- [ ] ~~**Saved items**~~ - ❌ NOT IN FRONTEND REQUIREMENTS
-- [x] **Response feedback** - Thumbs up/down on AI responses ✅ NEW
-- [x] **Search analytics** - Query logging + popular queries ✅ NEW
-- [x] **Session management** - Anonymous session tracking ✅ NEW
-- [x] **Rate limiting** - Per-endpoint limits ✅ REQUIRED
-
-### 4. What should move TO srt-data-layer?
-- [x] **Data pipeline scrapers** → Create AoC connector in srt-data-layer
-- [x] **Embedding logic** → Already centralized in vLLM embeddings
-- [x] **Vector indexing** → Use `/v1/ingest/*` endpoints
+### Artemis Configuration
+- **Upstream**: `aoc_backend` → `myashes-backend.hq.solidrust.net:8086`
+- **Location**: `/api/*` with CORS for myashes.ai
+- **Headers**: `X-Session-ID` exposed in CORS
 
 ---
 
-## Integration Requirements
+## Project Structure (Current)
 
-When this backend is deployed, it must use:
+```
+ashes-of-creation-assistant/
+├── backend/
+│   ├── app/
+│   │   ├── api/v1/
+│   │   │   ├── __init__.py       # Router registration
+│   │   │   ├── builds.py         # Build CRUD + voting
+│   │   │   ├── feedback.py       # AI response feedback
+│   │   │   └── analytics.py      # Search analytics
+│   │   ├── core/
+│   │   │   ├── config.py         # Settings (DB, Redis, CORS)
+│   │   │   ├── errors.py         # Custom exceptions
+│   │   │   ├── security.py       # ID generators
+│   │   │   └── session.py        # Session middleware
+│   │   ├── db/
+│   │   │   ├── base.py           # Model imports
+│   │   │   ├── base_class.py     # Base model class
+│   │   │   └── session.py        # DB session factory
+│   │   ├── game_constants/
+│   │   │   └── game_data.py      # CLASS_MATRIX, RACES, ARCHETYPES
+│   │   ├── models/
+│   │   │   ├── __init__.py
+│   │   │   ├── build.py          # Build + BuildVote models
+│   │   │   ├── feedback.py       # Feedback model
+│   │   │   └── analytics.py      # SearchAnalytics model
+│   │   ├── schemas/
+│   │   │   ├── builds.py         # Build Pydantic schemas
+│   │   │   ├── feedback.py       # Feedback schemas
+│   │   │   └── analytics.py      # Analytics schemas
+│   │   └── main.py               # FastAPI app
+│   ├── migrations/
+│   │   └── versions/
+│   │       ├── 001_create_builds_tables.py
+│   │       ├── 002_create_feedback_table.py
+│   │       └── 003_create_search_analytics_table.py
+│   ├── Dockerfile                # python:3.10-slim based
+│   ├── entrypoint.sh             # Wait for DB, run migrations, start app
+│   └── requirements.txt          # Slimmed dependencies
+├── k8s/
+│   ├── 00-namespace.yaml
+│   ├── 02-configmap.yaml
+│   ├── 03-secret.yaml            # Template only - real secret in K8s
+│   ├── 04-deployment.yaml
+│   ├── 05-service.yaml
+│   ├── 07-migration-job.yaml
+│   └── 08-keda-scaledobject.yaml
+├── .github/workflows/
+│   └── ci-cd.yml                 # Backend-only CI (lint, test, build)
+├── data-pipeline/                # TO MIGRATE to srt-data-layer
+└── CLAUDE.md                     # This file
+```
 
-### Platform Services (srt-hq-k8s)
-- **PostgreSQL**: CNPG cluster for relational data (users, builds)
-- **Artemis**: Proxy for frontend integration
-- **KEDA**: Auto-scaling based on load
-- **FluxCD**: GitOps deployment
+---
 
-### Shared Data Layer (srt-data-layer)
-- **DO NOT** implement your own vector search
-- **DO NOT** implement your own embedding generation
-- **DO NOT** implement your own RAG
-- **INSTEAD** call srt-data-layer APIs for all knowledge base operations
+## API Reference
 
-### Frontend Integration (myashes.ai)
-- All endpoints must be accessible via Artemis proxy
-- CORS must be configured for myashes.ai origin
-- Response formats must match frontend expectations
+### Builds
 
-**Agreed Integration Details (2026-01-14):**
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/v1/builds` | List builds (paginated, filterable) |
+| POST | `/api/v1/builds` | Create new build |
+| GET | `/api/v1/builds/{id}` | Get build by ID |
+| PATCH | `/api/v1/builds/{id}` | Update build (owner only) |
+| DELETE | `/api/v1/builds/{id}` | Delete build (owner only) |
+| POST | `/api/v1/builds/{id}/vote` | Vote on build (1-5) |
 
-| Item | Decision |
-|------|----------|
-| Session ID format | `sess_` + 24 hex chars (frontend generates) |
-| Session header | `X-Session-ID` on all requests |
-| Build ID format | `b_` + 8 hex chars (backend generates) |
-| Share URL format | `https://myashes.ai/?build={build_id}` (GitHub Pages limitation) |
-| Error response | `{"error": "code", "message": "text", "status": 404}` |
+### Feedback
 
-**Frontend Reference**: `/Users/shaun/repos/myashes.github.io/docs/BACKEND-INTEGRATION.md`
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/v1/feedback` | Submit AI response feedback |
 
-**Error Codes to Implement:**
-- `build_not_found` (404)
-- `validation_error` (400)
-- `already_voted` (409)
-- `rate_limited` (429)
-- `not_implemented` (501)
-- `internal_error` (500)
+**Payload**:
+```json
+{
+  "query": "search query",
+  "response_snippet": "AI response text",
+  "rating": "up" | "down",
+  "search_mode": "quick" | "smart" | "deep",
+  "comment": "optional"
+}
+```
 
-**Answers to Frontend Questions (2026-01-14):**
+### Analytics
 
-1. **Artemis `/api/*` routing**: NOT YET configured. Pending Phase 7 (K8s deployment). NGINX config template is ready in this CLAUDE.md. Frontend can test locally with direct backend calls until then.
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/v1/analytics/search` | Record search query |
+| GET | `/api/v1/analytics/popular-queries` | Get popular queries |
 
-2. **Session validation**: Backend will be lenient:
-   - If `X-Session-ID` header present → use it
-   - If missing → generate new session ID, return in `X-Session-ID` response header
-   - Frontend should capture returned header and store if it generated a request without one
-   - This enables graceful degradation and easier testing
+**Search Payload**:
+```json
+{
+  "query": "search query",
+  "search_mode": "quick" | "smart" | "deep",
+  "result_count": 5
+}
+```
 
-3. **Build deletion**: YES, adding to Phase 2 scope:
-   - `DELETE /api/v1/builds/{build_id}` - Delete a build
-   - Only the session that created the build can delete it
-   - Returns `403 Forbidden` with `not_owner` error code if session doesn't match
+### Session Handling
+- Send `X-Session-ID` header with requests
+- If missing, backend generates one and returns in response header
+- Session format: `sess_` + 24 hex chars
+
+### Error Response Format
+```json
+{
+  "error": "error_code",
+  "message": "Human readable message",
+  "status": 404
+}
+```
+
+---
+
+## Implementation Status
+
+### Completed Phases
+
+| Phase | Description | Status |
+|-------|-------------|--------|
+| 1 | Delete redundant code | ✅ COMPLETE |
+| 2 | Builds API (CRUD + voting) | ✅ COMPLETE |
+| 3 | Feedback API | ✅ COMPLETE |
+| 4 | Analytics API | ✅ COMPLETE |
+| 6 | Database + Config | ✅ COMPLETE |
+| 7 | K8s Deployment + Artemis | ✅ COMPLETE |
+
+### Remaining Work
+
+| Phase | Description | Priority |
+|-------|-------------|----------|
+| 5 | Rate limiting | LOW - can add later |
+| 8 | AoC connector migration | SEPARATE EFFORT |
+
+---
+
+## Frontend Integration Status
+
+**Message sent to frontend agent 2026-01-14:**
+
+```
+Backend deployment complete. All endpoints live via Artemis.
+
+ENDPOINTS AVAILABLE:
+- GET  /api/v1/builds           - List builds (paginated)
+- POST /api/v1/builds           - Create build
+- GET  /api/v1/builds/{id}      - Get build by ID
+- PATCH /api/v1/builds/{id}     - Update build
+- DELETE /api/v1/builds/{id}    - Delete build (owner only)
+- POST /api/v1/builds/{id}/vote - Vote on build (up/down)
+- POST /api/v1/feedback         - Submit AI feedback (thumbs up/down)
+- POST /api/v1/analytics/search - Record search analytics
+- GET  /api/v1/analytics/popular-queries - Get popular queries
+
+BASE URL: https://artemis.hq.solidrust.net
+
+SESSION TRACKING:
+- Send X-Session-ID header with requests
+- Header is exposed in CORS responses
+
+SEARCH MODES (for feedback/analytics):
+- "quick", "smart", "deep"
+
+Ready for frontend integration.
+```
+
+---
+
+## Development Commands
+
+```bash
+# Local development
+cd backend
+source .venv/bin/activate  # or: uv venv && source .venv/bin/activate
+uv pip install -r requirements.txt
+uv run uvicorn app.main:app --reload
+
+# Build and push Docker image
+docker build -t poseidon.hq.solidrust.net:30008/shaun/myashes-backend:latest -f backend/Dockerfile backend/
+docker push poseidon.hq.solidrust.net:30008/shaun/myashes-backend:latest
+
+# K8s deployment
+kubectl apply -f k8s/
+kubectl rollout restart deployment/myashes-backend -n myashes-backend
+
+# Check pod logs
+kubectl logs -l app=myashes-backend -n myashes-backend --tail=50
+
+# Database access (if needed)
+kubectl exec -it platform-postgres-3 -n data-platform -- psql -U postgres -d myashes
+```
 
 ---
 
@@ -196,374 +302,6 @@ When this backend is deployed, it must use:
 
 ---
 
-## Project Structure (After Phase 1 Cleanup)
-
-```
-ashes-of-creation-assistant/
-├── backend/                   # FastAPI backend (CLEANED)
-│   ├── app/
-│   │   ├── api/
-│   │   │   ├── __init__.py
-│   │   │   └── v1/
-│   │   │       ├── __init__.py
-│   │   │       └── builds.py      # Stub - implement in Phase 2
-│   │   ├── core/
-│   │   │   ├── config.py          # Simplified config (no Milvus/JWT)
-│   │   │   └── security.py        # Session ID generators
-│   │   ├── db/
-│   │   │   ├── base.py
-│   │   │   ├── base_class.py
-│   │   │   └── session.py
-│   │   ├── models/
-│   │   │   ├── __init__.py
-│   │   │   └── build.py           # Updated for frontend spec
-│   │   ├── services/
-│   │   │   ├── __init__.py
-│   │   │   └── cache_service.py   # Redis caching
-│   │   └── main.py                # FastAPI app entry point
-│   ├── .venv/                     # uv virtual environment
-│   ├── migrations/                # Alembic migrations (needs update)
-│   └── requirements.txt           # Slimmed dependencies (25 packages)
-├── frontend/                  # NOT USED - myashes.github.io instead
-├── data-pipeline/             # TO MIGRATE to srt-data-layer
-├── k8s/                       # NEEDS UPDATE for KEDA + FluxCD
-├── Dockerfile                 # NEEDS UPDATE for slimmer image
-└── CLAUDE.md                  # This file
-```
-
----
-
-## Current State Assessment (REVISED 2026-01-14)
-
-### API Endpoints - Action Required:
-
-| Current Endpoint | Purpose | Action | Notes |
-|------------------|---------|--------|-------|
-| `/v1/auth/*` | JWT authentication | ❌ DELETE | Frontend uses session-based auth (Phase 1) |
-| `/v1/users/*` | User profiles/prefs | ❌ DELETE | Not needed for Phase 1, OAuth comes later |
-| `/v1/builds/*` | Build CRUD | 🔄 REFACTOR | Rewrite to match frontend spec, add voting |
-| `/v1/chat/*` | RAG chat | ❌ DELETE | Frontend calls srt-data-layer directly |
-| `/v1/items/*` | Item search | ❌ DELETE | Frontend calls srt-data-layer directly |
-| `/v1/crafting/*` | Recipe search | ❌ DELETE | Frontend calls srt-data-layer directly |
-| `/v1/servers/*` | Server status | ❌ DELETE | Not in frontend requirements |
-| `/v1/locations/*` | Zone/POI search | ❌ DELETE | Frontend calls srt-data-layer directly |
-
-### New Endpoints - To Create:
-
-| Endpoint | Purpose | Priority | Phase |
-|----------|---------|----------|-------|
-| `GET /api/v1/builds/{build_id}` | Get build by ID | **1** | Phase 2 |
-| `POST /api/v1/builds` | Create build | **1** | Phase 2 |
-| `GET /api/v1/builds` | List builds with filters | **2** | Phase 2 |
-| `DELETE /api/v1/builds/{build_id}` | Delete build (owner only) | **2** | Phase 2 |
-| `POST /api/v1/builds/{build_id}/vote` | Rate a build (1-5) | **3** | Phase 2 |
-| `POST /api/v1/feedback` | AI response feedback | **4** | Phase 3 |
-| `POST /api/v1/analytics/search` | Log search events | **5** | Phase 4 |
-| `GET /api/v1/analytics/popular-queries` | Popular queries | **6** | Phase 4 |
-
-### Services - Action Required:
-
-| Service | Purpose | Action | Notes |
-|---------|---------|--------|-------|
-| `vector_store.py` | Milvus + embeddings | ❌ DELETE | srt-data-layer provides this |
-| `llm_service.py` | OpenAI API + RAG | ❌ DELETE | srt-data-layer provides this |
-| `cache_service.py` | Redis caching | ✅ KEEP | For popular queries cache |
-| `email.py` | SMTP service | ❌ DELETE | Not needed for Phase 1 |
-
-### Database Schema - New Tables:
-
-```sql
--- Builds table (replaces existing)
-CREATE TABLE builds (
-    build_id VARCHAR(12) PRIMARY KEY,  -- e.g., "b_abc123"
-    name VARCHAR(100) NOT NULL,
-    description TEXT,
-    primary_archetype VARCHAR(20) NOT NULL,
-    secondary_archetype VARCHAR(20) NOT NULL,
-    class_name VARCHAR(50) NOT NULL,  -- Computed from matrix
-    race VARCHAR(20) NOT NULL,
-    is_public BOOLEAN DEFAULT true,
-    session_id VARCHAR(64),  -- For anonymous users
-    user_id VARCHAR(64),     -- For authenticated users (future)
-    created_at TIMESTAMP DEFAULT NOW(),
-    updated_at TIMESTAMP DEFAULT NOW()
-);
-
--- Build votes table (NEW)
-CREATE TABLE build_votes (
-    vote_id SERIAL PRIMARY KEY,
-    build_id VARCHAR(12) REFERENCES builds(build_id),
-    session_id VARCHAR(64),
-    user_id VARCHAR(64),
-    rating INTEGER CHECK (rating >= 1 AND rating <= 5),
-    created_at TIMESTAMP DEFAULT NOW(),
-    UNIQUE(build_id, session_id),
-    UNIQUE(build_id, user_id)
-);
-
--- Feedback table (NEW)
-CREATE TABLE feedback (
-    feedback_id VARCHAR(12) PRIMARY KEY,
-    query TEXT NOT NULL,
-    response_snippet TEXT NOT NULL,
-    search_mode VARCHAR(10) NOT NULL,
-    rating VARCHAR(4) NOT NULL,  -- 'up' or 'down'
-    comment TEXT,
-    session_id VARCHAR(64),
-    created_at TIMESTAMP DEFAULT NOW()
-);
-
--- Search analytics table (NEW)
-CREATE TABLE search_analytics (
-    id SERIAL PRIMARY KEY,
-    query TEXT NOT NULL,
-    search_mode VARCHAR(10) NOT NULL,
-    result_count INTEGER,
-    latency_ms INTEGER,
-    sources_used TEXT[],
-    session_id VARCHAR(64),
-    created_at TIMESTAMP DEFAULT NOW()
-);
-
--- Materialized view for popular queries
-CREATE MATERIALIZED VIEW popular_queries AS
-SELECT
-    query,
-    COUNT(*) as count,
-    DATE_TRUNC('day', created_at) as day
-FROM search_analytics
-WHERE created_at > NOW() - INTERVAL '30 days'
-GROUP BY query, DATE_TRUNC('day', created_at);
-```
-
-### Rate Limiting Requirements:
-
-| Endpoint | Limit |
-|----------|-------|
-| `POST /api/v1/builds` | 10/min per session |
-| `POST /api/v1/builds/{id}/vote` | 30/min per session |
-| `POST /api/v1/feedback` | 20/min per session |
-| `POST /api/v1/analytics/search` | 60/min per session |
-| GET endpoints | 120/min per session |
-
-### Data Pipeline Migration:
-
-| Scraper | Target | Status |
-|---------|--------|--------|
-| `wiki_scraper.py` | srt-data-layer AoC connector | **TODO** - Create new connector |
-| `codex_scraper.py` | srt-data-layer AoC connector | **TODO** - Create new connector |
-| `official_website_scraper.py` | srt-data-layer AoC connector | **TODO** - Create new connector |
-| `game_files_processor.py` | srt-data-layer AoC connector | **TODO** - Create new connector |
-
----
-
-## Refactoring Plan (REVISED 2026-01-14)
-
-### Phase 1: Delete Redundant Code ✅ COMPLETE
-
-**Deleted Files (15 total):**
-- API Routers: `chat.py`, `items.py`, `crafting.py`, `locations.py`, `servers.py`
-- API Directories: `auth/`, `users/`
-- Services: `vector_store.py`, `llm_service.py`, `email.py`
-- Models/Schemas: `user.py`, `auth.py`, `users.py`
-- CRUD: `users.py`
-- Other: `discord_bot.py`, `config.py` (redundant)
-
-**Updated Files:**
-- `api/v1/__init__.py` - Only builds router remains
-- `models/__init__.py` - Removed user imports
-- `models/build.py` - Updated schema for frontend spec
-- `api/v1/builds.py` - Stub returning 501 until Phase 2
-- `core/config.py` - Removed JWT/Milvus/OpenAI settings
-- `core/security.py` - Session ID generators instead of JWT
-- `services/cache_service.py` - Fixed import path
-- `db/base.py` - Removed user model imports
-- `requirements.txt` - Reduced from 53 to 25 dependencies
-
-**Verified:** Server starts, health endpoints respond correctly
-
-### Phase 2: Implement Builds API ✅ COMPLETE
-
-**Implemented 2026-01-14:**
-
-| File | Purpose |
-|------|---------|
-| `core/errors.py` | Custom exceptions with agreed JSON format |
-| `core/session.py` | Session middleware (extract or generate session ID) |
-| `schemas/builds.py` | Pydantic schemas for all build operations |
-| `data/game_data.py` | CLASS_MATRIX (64), RACES (9), ARCHETYPES (8) |
-| `models/build.py` | Build + BuildVote SQLAlchemy models |
-| `api/v1/builds.py` | Full CRUD + voting endpoints |
-| `migrations/versions/001_create_builds_tables.py` | Database migration |
-
-**Endpoints implemented:**
-- `POST /api/v1/builds` - Create build
-- `GET /api/v1/builds/{build_id}` - Get build
-- `GET /api/v1/builds` - List with filters/pagination
-- `DELETE /api/v1/builds/{build_id}` - Delete (owner only)
-- `POST /api/v1/builds/{build_id}/vote` - Vote 1-5
-
-**Verified:** Server starts, session IDs generated, all endpoints respond correctly
-
-### Phase 3: Implement Feedback API ✅ COMPLETE
-
-**Implemented 2026-01-14:**
-
-| File | Purpose |
-|------|---------|
-| `schemas/feedback.py` | FeedbackCreate + FeedbackResponse Pydantic schemas |
-| `models/feedback.py` | Feedback SQLAlchemy model |
-| `api/v1/feedback.py` | POST endpoint for thumbs up/down |
-| `migrations/versions/002_create_feedback_table.py` | Database migration |
-
-**Endpoint implemented:**
-- `POST /api/v1/feedback` - Submit feedback with rating (up/down) and optional comment
-
-### Phase 4: Implement Analytics API ✅ COMPLETE
-
-**Implemented 2026-01-14:**
-
-| File | Purpose |
-|------|---------|
-| `schemas/analytics.py` | SearchAnalyticsCreate + PopularQueriesResponse Pydantic schemas |
-| `models/analytics.py` | SearchAnalytics SQLAlchemy model |
-| `api/v1/analytics.py` | POST and GET endpoints for analytics |
-| `migrations/versions/003_create_search_analytics_table.py` | Database migration |
-
-**Endpoints implemented:**
-- `POST /api/v1/analytics/search` - Record search query for analytics
-- `GET /api/v1/analytics/popular-queries` - Get popular queries with optional days/limit params
-
-### Phase 5: Session Management + Rate Limiting
-
-1. **Implement session middleware**:
-   - Generate session_id on first request
-   - Store in cookie or return in X-Session-ID header
-   - Associate with builds/votes/feedback
-
-2. **Implement rate limiting**:
-   - Use slowapi or custom Redis-based limiting
-   - Apply limits per endpoint as specified
-
-### Phase 6: Configuration + Database
-1. Update `backend/app/config.py`:
-   - Remove Milvus/embedding settings
-   - Add PostgreSQL connection (platform CNPG)
-   - Add Redis/Valkey connection (for cache + rate limiting)
-   - Configure CORS for myashes.ai + localhost:8080
-
-2. Create Alembic migration for new tables
-
-### Phase 7: Kubernetes Deployment
-1. Create namespace manifest for `myashes-backend`
-2. Create Deployment with KEDA ScaledObject
-3. Create Service and Ingress
-4. Configure Artemis proxy route: `/api/* → myashes-backend:8000`
-5. Set up FluxCD Kustomization
-
-### Phase 8: Data Pipeline Migration (Separate Effort)
-*This should happen in srt-data-layer repo:*
-1. Create `src/connectors/aoc.py` connector
-2. Port wiki/codex scraper logic
-3. Configure CronJob for daily sync
-4. After verified working, delete `data-pipeline/` from this repo
-
----
-
-## Deployment Requirements (Post-Refactoring)
-
-Once refactoring is complete, deployment must include:
-
-### KEDA Scaling
-```yaml
-# Example KEDA ScaledObject (to be created)
-apiVersion: keda.sh/v1alpha1
-kind: ScaledObject
-metadata:
-  name: myashes-backend
-  namespace: myashes-backend
-spec:
-  scaleTargetRef:
-    name: myashes-backend
-  minReplicaCount: 0
-  maxReplicaCount: 10
-  triggers:
-    - type: prometheus
-      # TBD: Define scaling metrics
-```
-
-### FluxCD Deployment
-- Manifests should be in srt-hq-k8s GitOps structure
-- Kustomization for environment overlays
-- Image automation for Docker Hub updates
-
-### Artemis Integration
-
-Artemis is an NGINX reverse proxy on AWS EC2 that routes public traffic to the K8s cluster.
-
-**Repository**: `/Users/shaun/repos/srt-inference-proxy/`
-**Config file**: `nginx.conf` (or `nginx-improved.conf`)
-
-**CORS already configured** for myashes.ai in the `$cors_origin` map:
-```nginx
-"https://myashes.ai" $http_origin;
-"https://www.myashes.ai" $http_origin;
-```
-
-**Add upstream definition**:
-```nginx
-upstream aoc_backend {
-    server myashes-backend.myashes-backend.svc.cluster.local:8000;
-    keepalive 32;
-}
-```
-
-**Add location block for `/api/*`**:
-```nginx
-location /api/ {
-    # CORS preflight
-    if ($request_method = 'OPTIONS') {
-        add_header Access-Control-Allow-Origin $cors_origin always;
-        add_header Access-Control-Allow-Methods "GET, POST, OPTIONS" always;
-        add_header Access-Control-Allow-Headers "Content-Type, Authorization, X-Requested-With, X-Session-ID" always;
-        add_header Access-Control-Max-Age 86400 always;
-        add_header Content-Length 0;
-        add_header Content-Type text/plain;
-        return 204;
-    }
-
-    # CORS headers
-    proxy_hide_header Access-Control-Allow-Origin;
-    proxy_hide_header Access-Control-Allow-Methods;
-    proxy_hide_header Access-Control-Allow-Headers;
-    add_header Access-Control-Allow-Origin $cors_origin always;
-    add_header Access-Control-Allow-Methods "GET, POST, OPTIONS" always;
-    add_header Access-Control-Allow-Headers "Content-Type, Authorization, X-Requested-With, X-Session-ID" always;
-
-    proxy_pass http://aoc_backend/api/;
-    proxy_http_version 1.1;
-    proxy_set_header Connection "";
-    proxy_set_header Host $host;
-    proxy_set_header X-Real-IP $remote_addr;
-    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-    proxy_set_header X-Forwarded-Proto $scheme;
-
-    proxy_read_timeout 30s;
-    proxy_connect_timeout 5s;
-    proxy_send_timeout 30s;
-
-    proxy_intercept_errors on;
-    error_page 502 503 504 = @aoc_error;
-}
-
-location @aoc_error {
-    add_header Content-Type application/json always;
-    return 503 '{"error":"MyAshes backend temporarily unavailable","retry_after":5}';
-}
-```
-
----
-
 ## User Preferences (CRITICAL)
 
 ### Shaun's Rules
@@ -574,46 +312,10 @@ location @aoc_error {
 - ❌ **NO temporary fixes**
 - ❌ **NO disabled functionality**
 
-### Agent Behavior
-- Run discovery FIRST in any new session
-- Update this CLAUDE.md with findings
-- Coordinate with myashes.github.io agent on API contracts
-- Check srt-data-layer before implementing any data features
-
----
-
-## Session Workflow
-
-### ~~Discovery~~ COMPLETED 2026-01-14
-### ~~Frontend Requirements~~ RECEIVED 2026-01-14
-### ~~Phase 1: Cleanup~~ COMPLETED 2026-01-14
-### ~~Phase 2: Builds API~~ COMPLETED 2026-01-14
-### ~~Phase 3: Feedback API~~ COMPLETED 2026-01-14
-### ~~Phase 4: Analytics API~~ COMPLETED 2026-01-14
-
-### Current Work: Phase 7 - Kubernetes Deployment
-1. Read this CLAUDE.md
-2. **Current Phase**: Phase 7 (K8s deployment to unblock frontend testing)
-3. Use `uv` for virtual environment: `cd backend && source .venv/bin/activate`
-4. Test locally with: `uv run uvicorn app.main:app --reload`
-5. Phase 5 (rate limiting) and Phase 6 (config) can be done after initial deployment
-
-### All Endpoints Implemented ✅
-1. ~~**GET /api/v1/builds/{build_id}**~~ ✅ DONE
-2. ~~**POST /api/v1/builds**~~ ✅ DONE
-3. ~~**GET /api/v1/builds**~~ ✅ DONE
-4. ~~**DELETE /api/v1/builds/{build_id}**~~ ✅ DONE
-5. ~~**POST /api/v1/builds/{id}/vote**~~ ✅ DONE
-6. ~~**POST /api/v1/feedback**~~ ✅ DONE
-7. ~~**POST /api/v1/analytics/search**~~ ✅ DONE
-8. ~~**GET /api/v1/analytics/popular-queries**~~ ✅ DONE
-
-### When Creating AoC Connector (in srt-data-layer repo)
-1. Copy `src/connectors/wikipedia.py` as template
-2. Implement `AoCWikiConnector` with Playwright scraping
-3. Register in `src/connectors/__init__.py`
-4. Add API routes in `src/api/routes/connectors.py`
-5. Add to CronJob in `k8s/05-connector-cronjob.yaml`
+### Container Registry
+- **Primary**: Gitea at `poseidon.hq.solidrust.net:30008`
+- **Token**: `GITEA_TOKEN` in `~/.zshrc`
+- **K8s Secret**: `gitea-registry` in `myashes-backend` namespace
 
 ---
 
@@ -621,46 +323,19 @@ location @aoc_error {
 
 | Date | Change | Impact |
 |------|--------|--------|
-| 2026-01-14 | **PHASE 4 COMPLETE** - All APIs implemented | Builds, Feedback, Analytics - ready for deployment |
-| 2026-01-14 | Phase 3 complete - Feedback API | Thumbs up/down on AI responses |
-| 2026-01-14 | Phase 2 complete - Builds API | Full CRUD + voting, session middleware, 64-class matrix |
-| 2026-01-14 | Phase 1 complete - Deleted redundant code | Removed 15 files, slimmed requirements.txt |
-| 2026-01-14 | Plan revised - Integrated frontend requirements | Simplified auth, added new endpoints |
-| 2026-01-14 | Frontend requirements received | BACKEND-REQUIREMENTS.md defines exact API contract |
-| 2026-01-14 | Discovery complete | Identified redundant code, created initial refactoring plan |
-| 2025-12-31 | AI chat LIVE on myashes.ai | Frontend working without this backend |
-| 2025-11-12 | Initial K8s manifests | Created but never deployed |
-
----
-
-## Requirements for srt-data-layer
-
-The following should be added to srt-data-layer:
-
-### New AoC Connector
-- **Source**: `src/connectors/aoc.py`
-- **Features**:
-  - Scrape ashesofcreation.wiki (game data, classes, races, items, etc.)
-  - Scrape codex.ashesofcreation.wiki
-  - Process official website content
-  - Game files extraction (if available)
-- **Endpoints**:
-  - `POST /v1/connectors/aoc/fetch` - Fetch specific pages
-  - `POST /v1/connectors/aoc/sync` - Incremental sync
-- **CronJob**: Daily sync at configured time
-
-### Metadata Schema for AoC Content
-Documents ingested should include:
-- `source`: "aoc-wiki", "aoc-codex", "aoc-official"
-- `type`: "class", "race", "item", "skill", "zone", "quest", etc.
-- `game_version`: Version/alpha number if applicable
-- `category`: Gameplay, World, Items, Systems, etc.
+| 2026-01-14 | **DEPLOYED TO K8S** | All endpoints live via Artemis |
+| 2026-01-14 | Phase 7 complete | K8s deployment, Artemis routing, DB permissions |
+| 2026-01-14 | Phase 4 complete | Analytics API (search recording, popular queries) |
+| 2026-01-14 | Phase 3 complete | Feedback API (thumbs up/down) |
+| 2026-01-14 | Phase 2 complete | Builds API (CRUD + voting) |
+| 2026-01-14 | Phase 1 complete | Deleted redundant code (15 files) |
+| 2026-01-14 | Discovery complete | Identified refactoring needs |
 
 ---
 
 **Last Updated**: 2026-01-14
-**Status**: Phase 4 COMPLETE - All APIs implemented, ready for deployment
-**Next Step**: Phase 7 - Kubernetes deployment to unblock frontend testing
+**Status**: DEPLOYED AND LIVE
+**Next Steps**: Frontend integration testing, then Phase 5 (rate limiting) if needed
 
 ---
 
