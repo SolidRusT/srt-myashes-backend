@@ -8,19 +8,22 @@ data:
   APP_NAME: "MyAshes.ai API"
   API_V1_STR: "/api/v1"
   DEBUG: "false"
+  ENVIRONMENT: "production"
 
   # Database settings (using platform PostgreSQL CNPG cluster)
   POSTGRES_HOST: "platform-postgres-rw.data-platform.svc.cluster.local"
   POSTGRES_PORT: "5432"
   POSTGRES_DB: "myashes"
 
-  # Milvus vector database (optional - not yet deployed)
-  # MILVUS_HOST: "milvus.data-platform.svc.cluster.local"
-  # MILVUS_PORT: "19530"
+  # Redis/Valkey cache (platform Valkey)
+  REDIS_HOST: "valkey.data-platform.svc.cluster.local"
+  REDIS_PORT: "6379"
 
-  # Redis cache (optional - can be enabled when Redis is deployed)
-  # REDIS_HOST: "redis.myashes-backend.svc.cluster.local"
-  # REDIS_PORT: "6379"
+  # Website URL for share links
+  WEBSITE_URL: "https://myashes.ai"
 
   # CORS origins
-  BACKEND_CORS_ORIGINS: '["https://myashes.lab.hq.solidrust.net", "https://myashes.ai"]'
+  BACKEND_CORS_ORIGINS: '["https://myashes.ai", "https://www.myashes.ai", "https://myashes.lab.hq.solidrust.net"]'
+
+  # Workers for production
+  WORKERS: "4"

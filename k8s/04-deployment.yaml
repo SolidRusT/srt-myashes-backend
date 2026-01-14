@@ -6,7 +6,7 @@ metadata:
   labels:
     app: myashes-backend
 spec:
-  replicas: 2  # HA for API backend
+  replicas: 2
   selector:
     matchLabels:
       app: myashes-backend
@@ -26,14 +26,15 @@ spec:
 
       containers:
       - name: myashes-backend
-        image: ghcr.io/suparious/myashes-backend:latest
+        # Image from GitHub Container Registry
+        image: ghcr.io/suparious/ashes-of-creation-assistant/backend:latest
         imagePullPolicy: Always
         ports:
         - containerPort: 8000
           name: http
           protocol: TCP
 
-        # Environment from ConfigMap
+        # Environment from ConfigMap and Secrets
         envFrom:
         - configMapRef:
             name: myashes-backend-config
@@ -47,11 +48,11 @@ spec:
 
         resources:
           requests:
-            cpu: 200m
-            memory: 512Mi
+            cpu: 100m
+            memory: 256Mi
           limits:
-            cpu: 1000m
-            memory: 2Gi  # ML dependencies need more memory
+            cpu: 500m
+            memory: 512Mi
 
         livenessProbe:
           httpGet:

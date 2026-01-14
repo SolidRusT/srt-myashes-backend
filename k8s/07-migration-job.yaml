@@ -3,7 +3,7 @@
 # kubectl apply -f k8s/07-migration-job.yaml
 # kubectl wait --for=condition=complete --timeout=300s job/myashes-db-migration -n myashes-backend
 #
-# Or use deploy.ps1 which handles this automatically
+# Note: The entrypoint.sh also runs migrations, so this is mainly for manual/CI use
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -34,7 +34,7 @@ spec:
 
       containers:
       - name: migration
-        image: ghcr.io/suparious/myashes-backend:latest
+        image: ghcr.io/suparious/ashes-of-creation-assistant/backend:latest
         imagePullPolicy: Always
         command: ["alembic", "upgrade", "head"]
 

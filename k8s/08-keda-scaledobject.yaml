@@ -1,0 +1,45 @@
+# KEDA ScaledObject for autoscaling based on HTTP traffic
+# Requires KEDA to be installed in the cluster
+# See: https://keda.sh/docs/2.13/scalers/prometheus/
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: myashes-backend-scaledobject
+  namespace: myashes-backend
+spec:
+  scaleTargetRef:
+    name: myashes-backend
+  minReplicaCount: 0  # Scale to zero when idle
+  maxReplicaCount: 10
+  cooldownPeriod: 300  # 5 minutes before scaling down
+  pollingInterval: 30
+
+  triggers:
+  # Scale based on HTTP requests per second (requires Prometheus)
+  - type: prometheus
+    metadata:
+      serverAddress: http://prometheus-server.monitoring.svc.cluster.local
+      metricName: http_requests_total
+      query: sum(rate(http_requests_total{namespace="myashes-backend"}[2m]))
+      threshold: "100"  # Scale up when > 100 req/sec
+
+  # Or use CPU-based scaling as fallback
+  - type: cpu
+    metricType: Utilization
+    metadata:
+      value: "70"  # Scale up when CPU > 70%
+
+---
+# Optional: Configure scale-to-zero behavior
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: myashes-backend-keda-config
+  namespace: myashes-backend
+data:
+  # Note: Scale-to-zero means cold starts. Consider keeping minReplicaCount: 1
+  # if low latency is critical for the first request.
+  description: |
+    This backend scales to zero after 5 minutes of inactivity.
+    First request after scale-to-zero may take 10-30 seconds.
+    For production, consider setting minReplicaCount: 1.
