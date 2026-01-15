@@ -235,17 +235,45 @@ ashes-of-creation-assistant/
 
 **Backend v2.0 is COMPLETE and LIVE.** All core functionality deployed and monitored.
 
-### Backlog
+### Backlog (Groomed 2026-01-14)
 
-| Item | Priority | Notes |
-|------|----------|-------|
-| Rate limiting | LOW | Add slowapi or Redis-based limiting if abuse detected |
-| AoC data connector | SEPARATE | Migrate data-pipeline/ scrapers to srt-data-layer |
-| Legacy cleanup | LOW | Delete old frontend/, docker/, nginx/, scripts/ |
+| Item | Priority | Effort | Notes |
+|------|----------|--------|-------|
+| Legacy cleanup | **HIGH** | 1 hour | Delete frontend/, docker/, nginx/, scripts/, *.ps1, *.sh - fixes 12 GitHub security alerts |
+| AoC data connector | MEDIUM | 30-54 hrs | Migrate data-pipeline/ scrapers to srt-data-layer (see below) |
+| Rate limiting | LOW | 2-4 hrs | Add slowapi if abuse detected - not needed yet |
+
+### AoC Data Connector Migration (Phase 8)
+
+**What exists**: 3 scrapers targeting [Ashes Wiki](https://ashesofcreation.wiki/), [Ashes Codex](https://ashescodex.com/), and [official site](https://ashesofcreation.com/)
+
+**Complexity factors**:
+- Playwright browser automation (may need architecture adaptation)
+- Milvus vector DB (srt-data-layer may use different backend)
+- Incremental state tracking (file-based → distributed)
+- ~300MB embedding model (BAAI/bge-large-en-v1.5)
+
+**Recommendation**: Spike first - prototype single scraper in srt-data-layer to validate patterns.
 
 ### Ideas for Future Work
 
-_To be populated during research phase_
+| Idea | Effort | Blocker/Notes |
+|------|--------|---------------|
+| Build templates | LOW | Pre-made builds for common playstyles (Tank, Healer, DPS) |
+| Popular builds widget | LOW | Show trending builds on homepage (data exists via analytics) |
+| Build search/filter | MEDIUM | Search by name, tags, description |
+| Economy tracker | HIGH | **BLOCKED** - No official API, game still in Early Access |
+| Discord bot | MEDIUM | `/build`, `/craft`, `/ask` commands - needs use case validation |
+| Interactive map | HIGH | [Ashes Codex](https://ashescodex.com/) already has comprehensive map |
+| User profiles | HIGH | Track builds, votes - needs auth system (currently session-only) |
+
+### Game Status Context
+
+- **AoC is in Early Access** on Steam since Dec 11, 2025
+- **No official API** - Intrepid still "considering" API design
+- **~70-80% core gameplay** implemented, content still being added
+- **Beta expected** late 2026, full release late 2026 / early 2027
+- Many features may be premature until game stabilizes
 
 ---
 
