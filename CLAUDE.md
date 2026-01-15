@@ -378,6 +378,19 @@ kubectl exec -it platform-postgres-3 -n data-platform -- psql -U postgres -d mya
 
 ---
 
+## Claude Code Configuration
+
+**Commands** (`.claude/commands/`):
+- No custom commands configured yet
+
+**MCP Tools** (`.mcp.json`):
+- `time` - Date calculations
+- `calculator` - Math operations
+- `github` - PR/issue management
+- `gitea` - Gitea PR/issue management
+
+---
+
 **Last Updated**: 2026-01-14
 **Status**: v2.0 DEPLOYED AND LIVE with full observability
 **Next Steps**: Research new features, groom backlog, create next implementation plan
