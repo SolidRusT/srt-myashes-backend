@@ -1,6 +1,6 @@
-# CLAUDE.md - Ashes of Creation Assistant Backend
+# CLAUDE.md - srt-myashes-backend
 
-**Project**: Community backend for Ashes of Creation game assistant
+**Project**: Product-specific backend for MyAshes.ai game assistant
 **Status**: v2.0 DEPLOYED AND LIVE
 **Visibility**: PUBLIC (community collaboration)
 **Last Updated**: 2026-01-14
@@ -106,7 +106,7 @@ This repo provides **product-specific backend services** for MyAshes.ai:
 ## Project Structure (Current)
 
 ```
-ashes-of-creation-assistant/
+srt-myashes-backend/
 ├── backend/
 │   ├── app/
 │   │   ├── api/v1/
@@ -381,13 +381,18 @@ kubectl exec -it platform-postgres-3 -n data-platform -- psql -U postgres -d mya
 ## Claude Code Configuration
 
 **Commands** (`.claude/commands/`):
-- No custom commands configured yet
+| Command | Description |
+|---------|-------------|
+| `/status` | Check deployment health, pod status, and recent logs |
+| `/deploy` | Build, push, and rollout new version |
+| `/logs` | View recent pod logs with error filtering |
 
 **MCP Tools** (`.mcp.json`):
 - `time` - Date calculations
 - `calculator` - Math operations
 - `github` - PR/issue management
 - `gitea` - Gitea PR/issue management
+- `kubernetes` - Direct K8s cluster access for pod/deployment management
 
 ---
 

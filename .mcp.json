@@ -8,6 +8,10 @@
       "command": "uvx",
       "args": ["mcp-server-calculator"]
     },
+    "kubernetes": {
+      "command": "npx",
+      "args": ["-y", "@strowk/mcp-k8s-go@latest", "-transport", "stdio"]
+    },
     "github": {
       "command": "npx",
       "args": ["-y", "@modelcontextprotocol/server-github"],
