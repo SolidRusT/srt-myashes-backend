@@ -155,16 +155,7 @@ ashes-of-creation-assistant/
 │   └── ci-cd.yml                 # Backend-only CI (lint, test, build)
 ├── data-pipeline/                # TO MIGRATE to srt-data-layer (Phase 8)
 ├── CLAUDE.md                     # This file (source of truth)
-│
-│   LEGACY (can be deleted):
-├── frontend/                     # Old Next.js app - replaced by myashes.github.io
-├── docker/                       # Old Docker Compose setup
-├── nginx/                        # Old nginx config
-├── scripts/                      # Old deployment scripts
-├── CUSTOM_INSTRUCTIONS.md        # Outdated - superseded by CLAUDE.md
-├── README.md                     # Outdated general README
-├── README-K8S.md                 # Outdated K8s docs
-└── *.ps1, *.sh (root)            # Old Windows/Linux deployment scripts
+└── README.md                     # Project overview
 ```
 
 ---
@@ -239,7 +230,7 @@ ashes-of-creation-assistant/
 
 | Item | Priority | Effort | Notes |
 |------|----------|--------|-------|
-| Legacy cleanup | **HIGH** | 1 hour | Delete frontend/, docker/, nginx/, scripts/, *.ps1, *.sh - fixes 12 GitHub security alerts |
+| ~~Legacy cleanup~~ | ~~HIGH~~ | ~~1 hour~~ | ✅ DONE - Deleted 119 files (frontend/, docker/, nginx/, scripts/, *.ps1, *.sh) |
 | AoC data connector | MEDIUM | 30-54 hrs | Migrate data-pipeline/ scrapers to srt-data-layer (see below) |
 | Rate limiting | LOW | 2-4 hrs | Add slowapi if abuse detected - not needed yet |
 
