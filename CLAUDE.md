@@ -226,30 +226,69 @@ srt-myashes-backend/
 
 **Backend v2.0 is COMPLETE and LIVE.** All core functionality deployed and monitored.
 
-### Backlog (Updated 2026-01-14)
+### Backlog (Updated 2026-01-15)
+
+#### Active Development
 
 | Item | Priority | Effort | Notes |
 |------|----------|--------|-------|
-| Build templates | LOW | 2-4 hrs | Pre-made builds for Tank, Healer, DPS playstyles |
-| Popular builds widget | LOW | 2-4 hrs | Show trending builds on homepage (data exists) |
-| Build search/filter | MEDIUM | 4-8 hrs | Search by name, tags, description |
-| AoC data connector | MEDIUM | 30-54 hrs | Migrate data-pipeline/ to srt-data-layer (spike first) |
-| Discord bot | MEDIUM | 16-24 hrs | `/build`, `/craft`, `/ask` commands |
-| Rate limiting | LOW | 2-4 hrs | Add slowapi if abuse detected |
-| User profiles | HIGH | 24-40 hrs | Needs auth system (currently session-only) |
-| Economy tracker | HIGH | 40+ hrs | **BLOCKED** - No official API yet |
+| **Authentication (Steam via PAM)** | HIGH | 24-32 hrs | Steam login via srt-pam-platform, protect write APIs |
+| **AI Data Quality Dashboard** | HIGH | 8-16 hrs | Admin view of negative feedback, flag bad data for cleanup |
+| **Build search/filter** | MEDIUM | 4-8 hrs | Search by name, tags, description |
 
-### AoC Data Connector Migration Details
+#### Quick Wins (Frontend Bundle)
 
-**What exists**: 3 scrapers targeting [Ashes Wiki](https://ashesofcreation.wiki/), [Ashes Codex](https://ashescodex.com/), and [official site](https://ashesofcreation.com/)
+*Ideal for single focused frontend agent session*
+
+| Item | Effort | Notes |
+|------|--------|-------|
+| Build templates | 2-4 hrs | Pre-made Tank/Healer/DPS builds |
+| Popular builds widget | 2-4 hrs | Trending builds on homepage |
+| **Total bundle** | **4-8 hrs** | |
+
+#### Research Required
+
+| Item | Notes |
+|------|-------|
+| AoC data connector migration | Review data-pipeline/, understand Playwright scrapers, plan migration to srt-data-layer |
+
+#### Low Priority / As Needed
+
+| Item | Effort | Notes |
+|------|--------|-------|
+| Rate limiting | 2-4 hrs | Add slowapi if abuse detected |
+| Discord bot | 16-24 hrs | /build, /craft, /ask commands |
+
+#### Blocked / Future
+
+| Item | Blocker | Notes |
+|------|---------|-------|
+| Economy tracker | No official API | Needs trustworthy manual input or API from Intrepid |
+| User profiles (full) | Needs auth first | Rich profiles after Steam/PAM integration |
+
+### Authentication Strategy
+
+**Approach**: Steam Login via PAM Platform
+
+- **Anonymous users**: Full localStorage experience, all read operations
+- **Authenticated users**: Can post builds, submit feedback, access admin features
+- **Implementation**: Steam OpenID → PAM creates/links account → JWT for MyAshes
+- **Related repo**: `/Users/shaun/repos/srt-pam-platform/`
+
+### AoC Data Connector (Research Needed)
+
+**What exists**: 3 scrapers in `data-pipeline/` targeting:
+- [Ashes Wiki](https://ashesofcreation.wiki/)
+- [Ashes Codex](https://ashescodex.com/)
+- [Official site](https://ashesofcreation.com/)
 
 **Complexity factors**:
-- Playwright browser automation (may need architecture adaptation)
-- Milvus vector DB (srt-data-layer may use different backend)
+- Playwright browser automation
+- Milvus vector DB (srt-data-layer may differ)
 - Incremental state tracking (file-based → distributed)
 - ~300MB embedding model (BAAI/bge-large-en-v1.5)
 
-**Recommendation**: Spike first - prototype single scraper in srt-data-layer to validate patterns.
+**Next step**: Dedicated research session to assess migration path.
 
 ### Game Status Context
 
@@ -257,7 +296,14 @@ srt-myashes-backend/
 - **No official API** - Intrepid still "considering" API design
 - **~70-80% core gameplay** implemented, content still being added
 - **Beta expected** late 2026, full release late 2026 / early 2027
-- Many features may be premature until game stabilizes
+
+### Data Quality Priority
+
+Users report AI chat outputs are sometimes inaccurate. Strategy:
+1. Review negative feedback in `feedback` table
+2. Identify problematic queries/responses
+3. Flag or remove bad embeddings in srt-data-layer
+4. Admin dashboard for ongoing quality monitoring (auth required)
 
 ---
 
