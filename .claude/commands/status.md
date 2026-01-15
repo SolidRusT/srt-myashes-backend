@@ -2,26 +2,36 @@
 
 Check the deployment status and health of the myashes-backend service.
 
-## Steps
+## Instructions
 
-1. **Check pod status**:
+Use the **Kubernetes MCP tools** (not bash) to check:
+
+1. **Pod status**: Use `mcp__kubernetes__kubectl_get` with:
+   - resourceType: "pods"
+   - namespace: "myashes-backend"
+   - labelSelector: "app=myashes-backend"
+
+2. **Deployment rollout status**: Use `mcp__kubernetes__kubectl_rollout` with:
+   - subCommand: "status"
+   - resourceType: "deployment"
+   - name: "myashes-backend"
+   - namespace: "myashes-backend"
+
+3. **Recent events**: Use `mcp__kubernetes__kubectl_get` with:
+   - resourceType: "events"
+   - namespace: "myashes-backend"
+   - sortBy: "lastTimestamp"
+
+4. **Endpoint health check** (use Bash for external curl):
    ```bash
-   kubectl get pods -n myashes-backend -l app=myashes-backend
+   curl -s -w "\nHTTP Status: %{http_code}\n" https://artemis.hq.solidrust.net/api/v1/builds?limit=1 | head -c 300
    ```
 
-2. **Check deployment rollout status**:
-   ```bash
-   kubectl rollout status deployment/myashes-backend -n myashes-backend --timeout=10s
-   ```
+## Report Format
 
-3. **Check recent events** (for errors):
-   ```bash
-   kubectl get events -n myashes-backend --sort-by='.lastTimestamp' | tail -10
-   ```
-
-4. **Check endpoint health** via Artemis:
-   ```bash
-   curl -s https://artemis.hq.solidrust.net/api/v1/builds?limit=1 | head -c 200
-   ```
-
-5. **Report any issues found** with recommended actions.
+Summarize findings:
+- Pod count and status (Running/Pending/Failed)
+- Deployment readiness
+- Any warning/error events
+- API endpoint responsiveness
+- Recommended actions if issues found

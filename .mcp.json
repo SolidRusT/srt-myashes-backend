@@ -10,7 +10,7 @@
     },
     "kubernetes": {
       "command": "npx",
-      "args": ["-y", "@strowk/mcp-k8s-go@latest", "-transport", "stdio"]
+      "args": ["-y", "mcp-server-kubernetes"]
     },
     "github": {
       "command": "npx",

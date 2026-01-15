@@ -1,36 +1,39 @@
 # /logs - View MyAshes Backend Logs
 
-View recent logs from the myashes-backend pods, with optional error filtering.
+View recent logs from the myashes-backend pods.
 
-## Basic Logs
+## Instructions
 
-```bash
-kubectl logs -l app=myashes-backend -n myashes-backend --tail=100 --all-containers=true
-```
+Use the **Kubernetes MCP tools** to fetch logs:
 
-## Error-Focused Logs
+### Basic Logs
 
-```bash
-kubectl logs -l app=myashes-backend -n myashes-backend --tail=200 | grep -iE "(error|exception|traceback|failed|critical)" | tail -50
-```
+Use `mcp__kubernetes__kubectl_logs` with:
+- resourceType: "deployment"
+- name: "myashes-backend"
+- namespace: "myashes-backend"
+- tail: 100
 
-## Follow Logs (Live)
+### Error-Focused Search
 
-```bash
-kubectl logs -l app=myashes-backend -n myashes-backend --tail=20 -f
-```
-(Use Ctrl+C to stop)
+After fetching logs, filter and highlight:
+- ERROR, Exception, Traceback
+- Failed, Critical
+- 5xx HTTP status codes
 
-## Specific Pod Logs
+### Previous Container Logs (if pod restarted)
 
-If you need logs from a specific pod:
-```bash
-kubectl get pods -n myashes-backend -l app=myashes-backend -o name | head -1 | xargs kubectl logs -n myashes-backend --tail=100
-```
+Use `mcp__kubernetes__kubectl_logs` with:
+- resourceType: "deployment"
+- name: "myashes-backend"
+- namespace: "myashes-backend"
+- tail: 100
+- previous: true
 
 ## Report Summary
 
 After viewing logs, summarize:
 - Any errors or exceptions found
-- Request patterns (if visible)
+- Request patterns (endpoints being hit)
+- Response times if visible
 - Recommended actions if issues detected

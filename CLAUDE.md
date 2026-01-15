@@ -3,7 +3,7 @@
 **Project**: Product-specific backend for MyAshes.ai game assistant
 **Status**: v2.0 DEPLOYED AND LIVE
 **Visibility**: PUBLIC (community collaboration)
-**Last Updated**: 2026-01-14
+**Last Updated**: 2026-01-15
 **Shaun's Golden Rule**: **No workarounds, no temporary fixes, no disabled functionality. Full solutions only.**
 
 ---
@@ -371,6 +371,7 @@ kubectl exec -it platform-postgres-3 -n data-platform -- psql -U postgres -d mya
 
 | Date | Change | Impact |
 |------|--------|--------|
+| 2026-01-15 | Claude Code commands expanded | 9 slash commands, 5 MCP tools, agent delegation |
 | 2026-01-14 | **v2.0 COMPLETE** | Archived initial implementation, docs cleanup |
 | 2026-01-14 | Prometheus metrics added | Full observability via Grafana |
 | 2026-01-14 | K8s deployment complete | All endpoints live via Artemis |
@@ -380,23 +381,48 @@ kubectl exec -it platform-postgres-3 -n data-platform -- psql -U postgres -d mya
 
 ## Claude Code Configuration
 
-**Commands** (`.claude/commands/`):
+### Slash Commands (`.claude/commands/`)
+
+**Operational Commands** - Use Kubernetes MCP tools directly:
+
 | Command | Description |
 |---------|-------------|
-| `/status` | Check deployment health, pod status, and recent logs |
-| `/deploy` | Build, push, and rollout new version |
+| `/status` | Check deployment health, pod status, events, and API health |
+| `/deploy` | Build Docker image, push to Gitea registry, rollout to K8s |
 | `/logs` | View recent pod logs with error filtering |
+| `/rollback` | Roll back deployment to previous revision |
+| `/db` | Check database connectivity, run read-only queries |
+| `/metrics` | View Prometheus metrics and pod resource usage |
 
-**MCP Tools** (`.mcp.json`):
-- `time` - Date calculations
-- `calculator` - Math operations
-- `github` - PR/issue management
-- `gitea` - Gitea PR/issue management
-- `kubernetes` - Direct K8s cluster access for pod/deployment management
+**Agent Commands** - Spawn sub-agents in related repositories:
+
+| Command | Description |
+|---------|-------------|
+| `/frontend` | Spawn agent in `myashes.github.io` for frontend tasks |
+| `/data-layer` | Spawn agent in `srt-data-layer` for RAG/vector platform tasks |
+| `/infra` | Spawn agent in `srt-hq-k8s` for infrastructure tasks |
+
+Agent commands preserve context in the current session while delegating work to specialized repositories. Each agent reads the target repo's CLAUDE.md and executes the specified task.
+
+### MCP Tools (`.mcp.json`)
+
+| Tool | Purpose |
+|------|---------|
+| `kubernetes` | Direct K8s cluster access (kubectl via MCP, no bash needed) |
+| `github` | GitHub PR/issue management |
+| `gitea` | Gitea PR/issue management for poseidon registry |
+| `time` | Date/time calculations |
+| `calculator` | Math operations |
+
+### Tool Preferences
+
+- **Prefer MCP tools over Bash** for Kubernetes operations - more reliable, no permission prompts
+- Use `mcp__kubernetes__kubectl_get`, `kubectl_logs`, `kubectl_rollout` instead of bash kubectl
+- Reserve Bash for: Docker builds, curl health checks, git operations
 
 ---
 
-**Last Updated**: 2026-01-14
+**Last Updated**: 2026-01-15
 **Status**: v2.0 DEPLOYED AND LIVE with full observability
 **Next Steps**: Research new features, groom backlog, create next implementation plan
 
