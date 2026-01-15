@@ -226,15 +226,20 @@ ashes-of-creation-assistant/
 
 **Backend v2.0 is COMPLETE and LIVE.** All core functionality deployed and monitored.
 
-### Backlog (Groomed 2026-01-14)
+### Backlog (Updated 2026-01-14)
 
 | Item | Priority | Effort | Notes |
 |------|----------|--------|-------|
-| ~~Legacy cleanup~~ | ~~HIGH~~ | ~~1 hour~~ | ✅ DONE - Deleted 119 files (frontend/, docker/, nginx/, scripts/, *.ps1, *.sh) |
-| AoC data connector | MEDIUM | 30-54 hrs | Migrate data-pipeline/ scrapers to srt-data-layer (see below) |
-| Rate limiting | LOW | 2-4 hrs | Add slowapi if abuse detected - not needed yet |
+| Build templates | LOW | 2-4 hrs | Pre-made builds for Tank, Healer, DPS playstyles |
+| Popular builds widget | LOW | 2-4 hrs | Show trending builds on homepage (data exists) |
+| Build search/filter | MEDIUM | 4-8 hrs | Search by name, tags, description |
+| AoC data connector | MEDIUM | 30-54 hrs | Migrate data-pipeline/ to srt-data-layer (spike first) |
+| Discord bot | MEDIUM | 16-24 hrs | `/build`, `/craft`, `/ask` commands |
+| Rate limiting | LOW | 2-4 hrs | Add slowapi if abuse detected |
+| User profiles | HIGH | 24-40 hrs | Needs auth system (currently session-only) |
+| Economy tracker | HIGH | 40+ hrs | **BLOCKED** - No official API yet |
 
-### AoC Data Connector Migration (Phase 8)
+### AoC Data Connector Migration Details
 
 **What exists**: 3 scrapers targeting [Ashes Wiki](https://ashesofcreation.wiki/), [Ashes Codex](https://ashescodex.com/), and [official site](https://ashesofcreation.com/)
 
@@ -245,18 +250,6 @@ ashes-of-creation-assistant/
 - ~300MB embedding model (BAAI/bge-large-en-v1.5)
 
 **Recommendation**: Spike first - prototype single scraper in srt-data-layer to validate patterns.
-
-### Ideas for Future Work
-
-| Idea | Effort | Blocker/Notes |
-|------|--------|---------------|
-| Build templates | LOW | Pre-made builds for common playstyles (Tank, Healer, DPS) |
-| Popular builds widget | LOW | Show trending builds on homepage (data exists via analytics) |
-| Build search/filter | MEDIUM | Search by name, tags, description |
-| Economy tracker | HIGH | **BLOCKED** - No official API, game still in Early Access |
-| Discord bot | MEDIUM | `/build`, `/craft`, `/ask` commands - needs use case validation |
-| Interactive map | HIGH | [Ashes Codex](https://ashescodex.com/) already has comprehensive map |
-| User profiles | HIGH | Track builds, votes - needs auth system (currently session-only) |
 
 ### Game Status Context
 
