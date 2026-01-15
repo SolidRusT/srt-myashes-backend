@@ -1,0 +1,23 @@
+{
+  "mcpServers": {
+    "time": {
+      "command": "uvx",
+      "args": ["mcp-server-time"]
+    },
+    "calculator": {
+      "command": "uvx",
+      "args": ["mcp-server-calculator"]
+    },
+    "github": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-github"],
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_TOKEN}"
+      }
+    },
+    "gitea": {
+      "command": "/Users/shaun/bin/gitea-mcp",
+      "args": ["-t", "stdio", "-host", "https://poseidon.hq.solidrust.net:30008", "-token", "${GITEA_TOKEN}"]
+    }
+  }
+}
