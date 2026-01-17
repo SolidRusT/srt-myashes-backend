@@ -3,6 +3,7 @@ Builds API Router - Character build persistence and sharing.
 
 Endpoints:
 - POST /api/v1/builds - Create a new build
+- GET /api/v1/builds/popular - Get popular/trending builds for widget
 - GET /api/v1/builds/{build_id} - Get a specific build
 - GET /api/v1/builds - List public builds with filters
 - DELETE /api/v1/builds/{build_id} - Delete a build (owner only)
@@ -13,6 +14,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import desc, func
 from sqlalchemy.exc import IntegrityError
 from typing import Optional
+from datetime import datetime, timedelta
 import logging
 
 from app.db.session import get_db
@@ -25,6 +27,9 @@ from app.schemas.builds import (
     VoteRequest,
     VoteResponse,
     DeleteResponse,
+    PopularBuildItem,
+    PopularBuildsResponse,
+    TimePeriod,
 )
 from app.core.errors import (
     BuildNotFoundError,
@@ -83,6 +88,19 @@ def build_to_list_item(build: Build) -> BuildListItem:
     )
 
 
+def build_to_popular_item(build: Build) -> PopularBuildItem:
+    """Convert a Build model to a PopularBuildItem schema."""
+    return PopularBuildItem(
+        build_id=build.build_id,
+        name=build.name,
+        class_name=build.class_name,
+        race=build.race,
+        rating=build.avg_rating,
+        vote_count=build.vote_count,
+        share_url=build_share_url(build.build_id),
+    )
+
+
 @router.post("", response_model=BuildResponse, status_code=status.HTTP_201_CREATED)
 async def create_build(
     build_data: BuildCreate,
@@ -137,6 +155,67 @@ async def create_build(
     logger.info(f"Created build {build_id} ({class_name}) for session {session_id[:8]}...")
 
     return build_to_response(build)
+
+
+@router.get("/popular", response_model=PopularBuildsResponse)
+async def get_popular_builds(
+    period: TimePeriod = Query(TimePeriod.WEEK, description="Time period to filter by"),
+    limit: int = Query(5, ge=1, le=20, description="Number of builds to return"),
+    db: Session = Depends(get_db)
+):
+    """
+    Get popular/trending builds for homepage widget display.
+
+    Returns top builds sorted by a combination of rating and vote count,
+    optionally filtered by time period.
+
+    Time periods:
+    - day: Last 24 hours
+    - week: Last 7 days
+    - month: Last 30 days
+    - all: All time
+
+    The popularity score is calculated as: (avg_rating * vote_count) to balance
+    both quality (rating) and engagement (votes).
+    """
+    # Base query - only public builds with at least 1 vote
+    query = db.query(Build).filter(
+        Build.is_public == True,
+        Build.vote_count > 0
+    )
+
+    # Apply time period filter
+    now = datetime.utcnow()
+    if period == TimePeriod.DAY:
+        cutoff = now - timedelta(days=1)
+        query = query.filter(Build.created_at >= cutoff)
+    elif period == TimePeriod.WEEK:
+        cutoff = now - timedelta(days=7)
+        query = query.filter(Build.created_at >= cutoff)
+    elif period == TimePeriod.MONTH:
+        cutoff = now - timedelta(days=30)
+        query = query.filter(Build.created_at >= cutoff)
+    # TimePeriod.ALL has no date filter
+
+    # Calculate popularity score: (rating_sum / vote_count) * vote_count = rating_sum
+    # But we want to favor builds with more votes, so we use:
+    # popularity = avg_rating * sqrt(vote_count) to balance quality and engagement
+    # For simplicity, we sort by weighted score: rating_sum (which is avg * count)
+    # This naturally balances high ratings with more votes
+    query = query.order_by(
+        desc(Build.rating_sum),  # Total rating points (quality * quantity)
+        desc(Build.vote_count),  # Tiebreaker: more votes
+        desc(Build.created_at)   # Tiebreaker: newer
+    )
+
+    # Limit results
+    builds = query.limit(limit).all()
+
+    return PopularBuildsResponse(
+        builds=[build_to_popular_item(b) for b in builds],
+        period=period.value,
+        count=len(builds),
+    )
 
 
 @router.get("/{build_id}", response_model=BuildResponse)
@@ -336,6 +415,7 @@ async def builds_health():
         "message": "Builds API is fully implemented",
         "endpoints": [
             "POST /api/v1/builds - Create build",
+            "GET /api/v1/builds/popular - Get popular builds",
             "GET /api/v1/builds/{build_id} - Get build",
             "GET /api/v1/builds - List builds",
             "DELETE /api/v1/builds/{build_id} - Delete build",
