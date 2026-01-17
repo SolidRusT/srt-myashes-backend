@@ -71,6 +71,23 @@ class Settings(BaseSettings):
     SESSION_COOKIE_NAME: str = "myashes_session"
     SESSION_EXPIRE_DAYS: int = 30
 
+    # PAM Platform configuration (authentication)
+    # In K8s: http://pam-platform.srt-pam-platform.svc.cluster.local:80
+    # Public: https://console.solidrust.ai
+    PAM_PLATFORM_URL: str = os.getenv(
+        "PAM_PLATFORM_URL",
+        "http://pam-platform.srt-pam-platform.svc.cluster.local:80"
+    )
+    PAM_PLATFORM_TIMEOUT: int = int(os.getenv("PAM_PLATFORM_TIMEOUT", "5"))
+
+    # Authentication settings
+    # When True, authentication is required for write operations (create/update/delete builds)
+    # When False, anonymous session-based ownership is used (backward compatible)
+    AUTH_REQUIRED_FOR_WRITES: bool = os.getenv("AUTH_REQUIRED_FOR_WRITES", "false").lower() == "true"
+
+    # Token validation cache TTL in seconds
+    AUTH_TOKEN_CACHE_TTL: int = int(os.getenv("AUTH_TOKEN_CACHE_TTL", "300"))
+
     model_config = ConfigDict(case_sensitive=True, env_file=".env")
 
 
