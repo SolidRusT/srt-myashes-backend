@@ -121,6 +121,40 @@ class InternalError(APIError):
         )
 
 
+# Authentication errors
+class AuthenticationError(APIError):
+    """Authentication failed - invalid or expired token."""
+
+    def __init__(self, message: str = "Authentication failed"):
+        super().__init__(
+            error="authentication_failed",
+            message=message,
+            status_code=status.HTTP_401_UNAUTHORIZED
+        )
+
+
+class AuthenticationRequiredError(APIError):
+    """Authentication is required for this endpoint."""
+
+    def __init__(self, message: str = "Authentication required. Please login with Steam."):
+        super().__init__(
+            error="authentication_required",
+            message=message,
+            status_code=status.HTTP_401_UNAUTHORIZED
+        )
+
+
+class SteamLinkRequiredError(APIError):
+    """User must link their Steam account to perform this action."""
+
+    def __init__(self):
+        super().__init__(
+            error="steam_link_required",
+            message="Please link your Steam account to create or modify builds",
+            status_code=status.HTTP_403_FORBIDDEN
+        )
+
+
 async def api_error_handler(request: Request, exc: APIError) -> JSONResponse:
     """Handle APIError exceptions and return JSON response."""
     return JSONResponse(
