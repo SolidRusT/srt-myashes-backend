@@ -226,84 +226,22 @@ srt-myashes-backend/
 
 **Backend v2.0 is COMPLETE and LIVE.** All core functionality deployed and monitored.
 
-### Backlog (Updated 2026-01-15)
+## Issue Tracking
 
-#### Active Development
+**Platform**: GitHub
+**Issues**: https://github.com/SolidRusT/srt-myashes-backend/issues
 
-| Item | Priority | Effort | Notes |
-|------|----------|--------|-------|
-| **Authentication (Steam via PAM)** | HIGH | 24-32 hrs | Steam login via srt-pam-platform, protect write APIs |
-| **AI Data Quality Dashboard** | HIGH | 8-16 hrs | Admin view of negative feedback, flag bad data for cleanup |
-| **Build search/filter** | MEDIUM | 4-8 hrs | Search by name, tags, description |
+Backlog, bugs, and enhancements are tracked as GitHub issues.
+This CLAUDE.md contains domain knowledge and patterns, not task tracking.
 
-#### Quick Wins (Frontend Bundle)
+**To check current work**: Review open issues
+**To add new work**: Create an issue with acceptance criteria
 
-*Ideal for single focused frontend agent session*
+### Key Context
 
-| Item | Effort | Notes |
-|------|--------|-------|
-| Build templates | 2-4 hrs | Pre-made Tank/Healer/DPS builds |
-| Popular builds widget | 2-4 hrs | Trending builds on homepage |
-| **Total bundle** | **4-8 hrs** | |
-
-#### Research Required
-
-| Item | Notes |
-|------|-------|
-| AoC data connector migration | Review data-pipeline/, understand Playwright scrapers, plan migration to srt-data-layer |
-
-#### Low Priority / As Needed
-
-| Item | Effort | Notes |
-|------|--------|-------|
-| Rate limiting | 2-4 hrs | Add slowapi if abuse detected |
-| Discord bot | 16-24 hrs | /build, /craft, /ask commands |
-
-#### Blocked / Future
-
-| Item | Blocker | Notes |
-|------|---------|-------|
-| Economy tracker | No official API | Needs trustworthy manual input or API from Intrepid |
-| User profiles (full) | Needs auth first | Rich profiles after Steam/PAM integration |
-
-### Authentication Strategy
-
-**Approach**: Steam Login via PAM Platform
-
-- **Anonymous users**: Full localStorage experience, all read operations
-- **Authenticated users**: Can post builds, submit feedback, access admin features
-- **Implementation**: Steam OpenID → PAM creates/links account → JWT for MyAshes
-- **Related repo**: `/Users/shaun/repos/srt-pam-platform/`
-
-### AoC Data Connector (Research Needed)
-
-**What exists**: 3 scrapers in `data-pipeline/` targeting:
-- [Ashes Wiki](https://ashesofcreation.wiki/)
-- [Ashes Codex](https://ashescodex.com/)
-- [Official site](https://ashesofcreation.com/)
-
-**Complexity factors**:
-- Playwright browser automation
-- Milvus vector DB (srt-data-layer may differ)
-- Incremental state tracking (file-based → distributed)
-- ~300MB embedding model (BAAI/bge-large-en-v1.5)
-
-**Next step**: Dedicated research session to assess migration path.
-
-### Game Status Context
-
-- **AoC is in Early Access** on Steam since Dec 11, 2025
-- **No official API** - Intrepid still "considering" API design
-- **~70-80% core gameplay** implemented, content still being added
-- **Beta expected** late 2026, full release late 2026 / early 2027
-
-### Data Quality Priority
-
-Users report AI chat outputs are sometimes inaccurate. Strategy:
-1. Review negative feedback in `feedback` table
-2. Identify problematic queries/responses
-3. Flag or remove bad embeddings in srt-data-layer
-4. Admin dashboard for ongoing quality monitoring (auth required)
+- **Authentication Strategy**: Steam Login via PAM Platform (anonymous read, authenticated write)
+- **Game Status**: AoC is in Early Access (Dec 2025), no official API yet
+- **Data Quality**: Users report some AI inaccuracies - see AI Data Quality Dashboard issue
 
 ---
 
