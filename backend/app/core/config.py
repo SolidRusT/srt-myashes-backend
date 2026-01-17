@@ -5,7 +5,7 @@ This backend provides product-specific services (builds, feedback, analytics).
 RAG/vector search is handled by srt-data-layer.
 """
 import os
-from typing import List, Optional, Dict, Any, Union
+from typing import List, Optional, Dict, Any, Union, Set
 from pydantic import field_validator, model_validator, ConfigDict
 from pydantic_settings import BaseSettings
 
@@ -87,6 +87,26 @@ class Settings(BaseSettings):
 
     # Token validation cache TTL in seconds
     AUTH_TOKEN_CACHE_TTL: int = int(os.getenv("AUTH_TOKEN_CACHE_TTL", "300"))
+
+    # Admin configuration
+    # Comma-separated list of Steam IDs authorized for admin access
+    # Default includes Suparious (76561198024774727)
+    ADMIN_STEAM_IDS: Set[str] = set()
+
+    @field_validator("ADMIN_STEAM_IDS", mode='before')
+    @classmethod
+    def parse_admin_steam_ids(cls, v: Union[str, Set[str], List[str], None]) -> Set[str]:
+        """Parse admin Steam IDs from comma-separated string or collection."""
+        if v is None:
+            # Default admin: Suparious
+            return {"76561198024774727"}
+        if isinstance(v, str):
+            if not v.strip():
+                return {"76561198024774727"}
+            return {id.strip() for id in v.split(",") if id.strip()}
+        if isinstance(v, (list, set)):
+            return set(v)
+        return {"76561198024774727"}
 
     model_config = ConfigDict(case_sensitive=True, env_file=".env")
 

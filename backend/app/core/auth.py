@@ -1,205 +1,107 @@
 """
-Authentication module for MyAshes.ai backend.
+Authentication utilities for MyAshes.ai backend.
 
-Provides JWT validation against PAM Platform for Steam-authenticated users.
-Supports anonymous access (returns None) for read operations.
-
-Flow:
-1. User authenticates via Steam OpenID on PAM Platform (console.solidrust.ai)
-2. PAM Platform issues JWT token with player_id and steam_id claims
-3. Frontend includes JWT in Authorization header: "Bearer <token>"
-4. This module validates JWT against PAM Platform
-5. Authenticated users can create/modify builds with their Steam identity
-
-Key design decisions:
-- Anonymous access is allowed (get_current_user returns None)
-- Use require_auth dependency for write endpoints
-- JWT validation is done via PAM Platform API (not local verification)
-- Steam ID and display name are extracted from JWT claims
+Provides admin authentication via Steam ID whitelist.
 """
-import httpx
-import logging
-from dataclasses import dataclass
 from typing import Optional
-from fastapi import Request, Depends, HTTPException, status
-from functools import lru_cache
-import time
+from fastapi import Depends, HTTPException, Request, status
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 from app.core.config import settings
 
-logger = logging.getLogger(__name__)
-
-# Cache for token validation results (TTL: 5 minutes)
-_token_cache: dict[str, tuple[float, "AuthenticatedUser"]] = {}
-TOKEN_CACHE_TTL = 300  # 5 minutes
+# HTTP Bearer scheme for token extraction
+security = HTTPBearer(auto_error=False)
 
 
-@dataclass
-class AuthenticatedUser:
-    """Represents an authenticated user from PAM Platform."""
-    player_id: str  # PAM Platform player ID
-    steam_id: Optional[str]  # Steam 64-bit ID
-    steam_display_name: Optional[str]  # Steam persona name
-    email: Optional[str]  # Email if available
-    tier: str = "free"  # Subscription tier (free, pro, enterprise)
-
-    @property
-    def display_name(self) -> str:
-        """Get the best display name available."""
-        if self.steam_display_name:
-            return self.steam_display_name
-        if self.email:
-            return self.email.split('@')[0]
-        return f"Player_{self.player_id[:8]}"
-
-
-def _get_cached_user(token: str) -> Optional[AuthenticatedUser]:
-    """Get cached user from token if still valid."""
-    if token in _token_cache:
-        cached_time, user = _token_cache[token]
-        if time.time() - cached_time < TOKEN_CACHE_TTL:
-            return user
-        else:
-            # Expired, remove from cache
-            del _token_cache[token]
+def get_steam_id_from_request(request: Request) -> Optional[str]:
+    """
+    Extract Steam ID from request.
+    
+    Checks multiple sources:
+    1. X-Steam-ID header (set by PAM Platform after validation)
+    2. Request state (set by middleware after PAM token validation)
+    
+    Returns None if no Steam ID found.
+    """
+    # Check header first (set by API gateway/PAM after auth)
+    steam_id = request.headers.get("X-Steam-ID")
+    if steam_id:
+        return steam_id
+    
+    # Check request state (set by auth middleware)
+    steam_id = getattr(request.state, "steam_id", None)
+    if steam_id:
+        return steam_id
+    
     return None
 
 
-def _cache_user(token: str, user: AuthenticatedUser) -> None:
-    """Cache authenticated user."""
-    # Limit cache size to prevent memory issues
-    if len(_token_cache) > 1000:
-        # Remove oldest entries
-        oldest_tokens = sorted(_token_cache.keys(), key=lambda t: _token_cache[t][0])[:100]
-        for t in oldest_tokens:
-            del _token_cache[t]
-    _token_cache[token] = (time.time(), user)
-
-
-async def validate_token_with_pam(token: str) -> Optional[AuthenticatedUser]:
+def is_admin(steam_id: Optional[str]) -> bool:
     """
-    Validate JWT token against PAM Platform.
+    Check if a Steam ID is in the admin whitelist.
     
-    PAM Platform provides token introspection endpoint that returns:
-    - valid: bool
-    - player_id: str
-    - steam_id: str (optional)
-    - steam_display_name: str (optional)
-    - email: str (optional)
-    - tier: str
-    
-    Returns AuthenticatedUser if valid, None if invalid.
+    Args:
+        steam_id: Steam 64-bit ID to check
+        
+    Returns:
+        True if steam_id is in ADMIN_STEAM_IDS, False otherwise
     """
-    # Check cache first
-    cached = _get_cached_user(token)
-    if cached:
-        logger.debug(f"Token cache hit for player {cached.player_id}")
-        return cached
+    if not steam_id:
+        return False
     
-    # Validate against PAM Platform
-    try:
-        async with httpx.AsyncClient(timeout=5.0) as client:
-            response = await client.post(
-                f"{settings.PAM_PLATFORM_URL}/v1/auth/introspect",
-                headers={
-                    "Authorization": f"Bearer {token}",
-                    "Content-Type": "application/json",
-                },
-                json={"token": token}
-            )
-            
-            if response.status_code == 200:
-                data = response.json()
-                if data.get("valid", False):
-                    user = AuthenticatedUser(
-                        player_id=data.get("player_id", ""),
-                        steam_id=data.get("steam_id"),
-                        steam_display_name=data.get("steam_display_name"),
-                        email=data.get("email"),
-                        tier=data.get("tier", "free"),
-                    )
-                    _cache_user(token, user)
-                    logger.info(f"Authenticated user: {user.display_name} (player_id: {user.player_id})")
-                    return user
-                else:
-                    logger.debug("Token validation failed: invalid token")
-                    return None
-            elif response.status_code == 401:
-                logger.debug("Token validation failed: unauthorized")
-                return None
-            else:
-                logger.warning(f"PAM Platform returned unexpected status: {response.status_code}")
-                return None
-                
-    except httpx.TimeoutException:
-        logger.error("PAM Platform token validation timed out")
-        return None
-    except httpx.RequestError as e:
-        logger.error(f"PAM Platform request error: {e}")
-        return None
-    except Exception as e:
-        logger.error(f"Unexpected error validating token: {e}")
-        return None
+    return steam_id in settings.ADMIN_STEAM_IDS
 
 
-async def get_current_user(request: Request) -> Optional[AuthenticatedUser]:
+async def require_admin(
+    request: Request,
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
+) -> str:
     """
-    Extract and validate JWT from Authorization header.
+    FastAPI dependency that requires admin access.
+    
+    Extracts Steam ID from request and verifies it's in the admin whitelist.
+    Raises 401 if no Steam ID found, 403 if not an admin.
     
     Returns:
-    - AuthenticatedUser if valid token provided
-    - None if no token or invalid token (anonymous access)
-    
-    This dependency allows anonymous access. Use require_auth for
-    endpoints that require authentication.
+        The admin's Steam ID
+        
+    Raises:
+        HTTPException: 401 if not authenticated, 403 if not admin
     """
-    auth_header = request.headers.get("Authorization")
+    steam_id = get_steam_id_from_request(request)
     
-    if not auth_header:
-        return None
-    
-    # Expect "Bearer <token>" format
-    parts = auth_header.split()
-    if len(parts) != 2 or parts[0].lower() != "bearer":
-        return None
-    
-    token = parts[1]
-    
-    # Validate token with PAM Platform
-    return await validate_token_with_pam(token)
-
-
-async def require_auth(request: Request) -> AuthenticatedUser:
-    """
-    Dependency that requires authentication.
-    
-    Raises HTTPException 401 if not authenticated.
-    Use this for write endpoints (create, update, delete).
-    """
-    user = await get_current_user(request)
-    
-    if user is None:
+    if not steam_id:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail={
-                "error": "authentication_required",
-                "message": "Authentication required. Please login with Steam.",
-                "status": 401
-            },
-            headers={"WWW-Authenticate": "Bearer"}
+            detail="Authentication required. Please log in with Steam.",
+            headers={"WWW-Authenticate": "Bearer"},
         )
     
-    return user
+    if not is_admin(steam_id):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin access required. Your Steam ID is not authorized.",
+        )
+    
+    return steam_id
 
 
-def get_creator_name(user: Optional[AuthenticatedUser]) -> str:
+async def optional_admin(
+    request: Request,
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
+) -> Optional[str]:
     """
-    Get display name for build creator.
+    FastAPI dependency that optionally extracts admin Steam ID.
+    
+    Unlike require_admin, this doesn't raise exceptions.
+    Returns the Steam ID if authenticated and admin, None otherwise.
     
     Returns:
-    - Steam display name if authenticated with Steam
-    - "anonymous" if not authenticated
+        Admin Steam ID or None
     """
-    if user is None:
-        return "anonymous"
-    return user.display_name
+    steam_id = get_steam_id_from_request(request)
+    
+    if steam_id and is_admin(steam_id):
+        return steam_id
+    
+    return None

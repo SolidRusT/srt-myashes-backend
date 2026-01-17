@@ -27,3 +27,7 @@ data:
 
   # Workers for production
   WORKERS: "4"
+
+  # Admin Steam IDs (comma-separated)
+  # Suparious: 76561198024774727
+  ADMIN_STEAM_IDS: "76561198024774727"
