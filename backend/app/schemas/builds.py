@@ -4,10 +4,19 @@ Pydantic schemas for Build API.
 These schemas define the request/response formats for the builds endpoints.
 """
 from pydantic import BaseModel, Field, field_validator
-from typing import Optional, List
+from typing import Optional, List, Literal
 from datetime import datetime
+from enum import Enum
 
 from app.game_constants.game_data import ARCHETYPES, VALID_RACES
+
+
+class TimePeriod(str, Enum):
+    """Time period for popular builds filtering."""
+    DAY = "day"
+    WEEK = "week"
+    MONTH = "month"
+    ALL = "all"
 
 
 class BuildCreate(BaseModel):
@@ -85,6 +94,29 @@ class BuildListResponse(BaseModel):
     page: int
     limit: int
     has_more: bool
+
+
+class PopularBuildItem(BaseModel):
+    """Build item for popular builds widget."""
+
+    build_id: str
+    name: str
+    class_name: str
+    race: str
+    rating: Optional[float] = None
+    vote_count: int = 0
+    share_url: str
+
+    class Config:
+        from_attributes = True
+
+
+class PopularBuildsResponse(BaseModel):
+    """Response for popular builds widget."""
+
+    builds: List[PopularBuildItem]
+    period: str
+    count: int
 
 
 class VoteRequest(BaseModel):
