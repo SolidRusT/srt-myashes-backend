@@ -6,8 +6,18 @@ Endpoints:
 - GET /api/v1/builds/popular - Get popular/trending builds for widget
 - GET /api/v1/builds/{build_id} - Get a specific build
 - GET /api/v1/builds - List public builds with filters
+- PATCH /api/v1/builds/{build_id} - Update a build (owner only)
 - DELETE /api/v1/builds/{build_id} - Delete a build (owner only)
 - POST /api/v1/builds/{build_id}/vote - Vote on a build
+- GET /api/v1/builds/auth/status - Check authentication status
+- POST /api/v1/builds/auth/claim - Claim anonymous builds
+
+Authentication Strategy:
+- Anonymous users can read all public builds
+- Anonymous users can create builds (session-based ownership)
+- Authenticated users (Steam via PAM) get their Steam identity attached to builds
+- Build ownership is checked via session_id OR player_id
+- When AUTH_REQUIRED_FOR_WRITES=true, only authenticated users can create/modify
 """
 from fastapi import APIRouter, Depends, Query, Request, status
 from sqlalchemy.orm import Session
@@ -24,22 +34,29 @@ from app.schemas.builds import (
     BuildResponse,
     BuildListItem,
     BuildListResponse,
+    BuildUpdateRequest,
     VoteRequest,
     VoteResponse,
     DeleteResponse,
     PopularBuildItem,
     PopularBuildsResponse,
     TimePeriod,
+    CreatorInfo,
+    AuthStatusResponse,
+    ClaimBuildsRequest,
+    ClaimBuildsResponse,
 )
 from app.core.errors import (
     BuildNotFoundError,
     ValidationError,
     AlreadyVotedError,
     NotOwnerError,
+    AuthenticationRequiredError,
 )
 from app.core.security import generate_build_id
 from app.core.session import get_session_id
 from app.core.config import settings
+from app.core.auth import get_current_user, AuthenticatedUser
 from app.game_constants.game_data import get_class_name, validate_archetype, validate_race
 
 logger = logging.getLogger(__name__)
@@ -50,6 +67,15 @@ router = APIRouter()
 def build_share_url(build_id: str) -> str:
     """Generate the share URL for a build."""
     return f"{settings.WEBSITE_URL}/?build={build_id}"
+
+
+def build_creator_info(build: Build) -> CreatorInfo:
+    """Create CreatorInfo from build model."""
+    return CreatorInfo(
+        display_name=build.creator_display_name,
+        steam_id=build.steam_id,
+        is_authenticated=build.is_authenticated,
+    )
 
 
 def build_to_response(build: Build) -> BuildResponse:
@@ -68,7 +94,8 @@ def build_to_response(build: Build) -> BuildResponse:
         updated_at=build.updated_at,
         rating=build.avg_rating,
         vote_count=build.vote_count,
-        created_by="anonymous",  # Will be username when OAuth is implemented
+        created_by=build.creator_display_name,
+        creator=build_creator_info(build),
     )
 
 
@@ -85,6 +112,7 @@ def build_to_list_item(build: Build) -> BuildListItem:
         rating=build.avg_rating,
         vote_count=build.vote_count,
         created_at=build.created_at,
+        created_by=build.creator_display_name,
     )
 
 
@@ -98,6 +126,101 @@ def build_to_popular_item(build: Build) -> PopularBuildItem:
         rating=build.avg_rating,
         vote_count=build.vote_count,
         share_url=build_share_url(build.build_id),
+        created_by=build.creator_display_name,
+    )
+
+
+def check_build_ownership(build: Build, session_id: str, user: Optional[AuthenticatedUser]) -> bool:
+    """
+    Check if the requester owns the build.
+    
+    Ownership is determined by:
+    1. Matching session_id (anonymous ownership)
+    2. Matching player_id (authenticated ownership via PAM)
+    """
+    # Check session-based ownership
+    if build.session_id == session_id:
+        return True
+    
+    # Check authenticated ownership
+    if user and build.player_id and build.player_id == user.player_id:
+        return True
+    
+    return False
+
+
+@router.get("/auth/status", response_model=AuthStatusResponse)
+async def get_auth_status(
+    request: Request,
+    user: Optional[AuthenticatedUser] = Depends(get_current_user),
+):
+    """
+    Check authentication status.
+    
+    Returns information about the current user if authenticated,
+    or anonymous status if not.
+    """
+    if user:
+        return AuthStatusResponse(
+            authenticated=True,
+            player_id=user.player_id,
+            steam_id=user.steam_id,
+            display_name=user.display_name,
+            tier=user.tier,
+        )
+    return AuthStatusResponse(
+        authenticated=False,
+        tier="anonymous",
+    )
+
+
+@router.post("/auth/claim", response_model=ClaimBuildsResponse)
+async def claim_anonymous_builds(
+    claim_request: ClaimBuildsRequest,
+    request: Request,
+    user: Optional[AuthenticatedUser] = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Claim anonymous builds created with a session ID.
+    
+    This allows users who created builds before authenticating
+    to link those builds to their Steam account.
+    
+    Requires authentication.
+    """
+    if not user:
+        raise AuthenticationRequiredError("You must be logged in to claim builds")
+    
+    # Find all builds with the given session_id that don't have a player_id
+    builds_to_claim = db.query(Build).filter(
+        Build.session_id == claim_request.session_id,
+        Build.player_id == None  # noqa: E711
+    ).all()
+    
+    if not builds_to_claim:
+        return ClaimBuildsResponse(
+            claimed_count=0,
+            build_ids=[],
+            message="No anonymous builds found for this session",
+        )
+    
+    # Claim the builds
+    claimed_ids = []
+    for build in builds_to_claim:
+        build.player_id = user.player_id
+        build.steam_id = user.steam_id
+        build.steam_display_name = user.steam_display_name
+        claimed_ids.append(build.build_id)
+    
+    db.commit()
+    
+    logger.info(f"User {user.player_id} claimed {len(claimed_ids)} builds from session {claim_request.session_id[:8]}...")
+    
+    return ClaimBuildsResponse(
+        claimed_count=len(claimed_ids),
+        build_ids=claimed_ids,
+        message=f"Successfully claimed {len(claimed_ids)} builds",
     )
 
 
@@ -105,15 +228,29 @@ def build_to_popular_item(build: Build) -> PopularBuildItem:
 async def create_build(
     build_data: BuildCreate,
     request: Request,
+    user: Optional[AuthenticatedUser] = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
     Create a new character build.
 
     The class_name is computed from primary_archetype + secondary_archetype.
-    The build is associated with the session ID for ownership.
+    
+    If authenticated (Steam via PAM):
+    - Build is linked to player_id and steam_id
+    - Creator name shows Steam display name
+    
+    If anonymous:
+    - Build is linked to session_id only
+    - Creator name shows "anonymous"
+    
+    When AUTH_REQUIRED_FOR_WRITES is enabled, authentication is required.
     """
     session_id = get_session_id(request)
+    
+    # Check if authentication is required for writes
+    if settings.AUTH_REQUIRED_FOR_WRITES and not user:
+        raise AuthenticationRequiredError("Authentication required to create builds")
 
     # Validate archetypes
     if not validate_archetype(build_data.primary_archetype):
@@ -135,7 +272,7 @@ async def create_build(
     # Generate unique build ID
     build_id = generate_build_id()
 
-    # Create build
+    # Create build with authentication info if available
     build = Build(
         build_id=build_id,
         name=build_data.name,
@@ -146,13 +283,18 @@ async def create_build(
         race=build_data.race,
         is_public=build_data.is_public,
         session_id=session_id,
+        # Authentication fields (if user is authenticated)
+        player_id=user.player_id if user else None,
+        steam_id=user.steam_id if user else None,
+        steam_display_name=user.steam_display_name if user else None,
     )
 
     db.add(build)
     db.commit()
     db.refresh(build)
 
-    logger.info(f"Created build {build_id} ({class_name}) for session {session_id[:8]}...")
+    creator_info = f"by {user.display_name}" if user else f"anonymously (session {session_id[:8]}...)"
+    logger.info(f"Created build {build_id} ({class_name}) {creator_info}")
 
     return build_to_response(build)
 
@@ -222,6 +364,7 @@ async def get_popular_builds(
 async def get_build(
     build_id: str,
     request: Request,
+    user: Optional[AuthenticatedUser] = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
@@ -238,8 +381,9 @@ async def get_build(
         raise BuildNotFoundError(build_id)
 
     # Check access for private builds
-    if not build.is_public and build.session_id != session_id:
-        raise BuildNotFoundError(build_id)  # Don't reveal that it exists
+    if not build.is_public:
+        if not check_build_ownership(build, session_id, user):
+            raise BuildNotFoundError(build_id)  # Don't reveal that it exists
 
     return build_to_response(build)
 
@@ -314,16 +458,23 @@ async def list_builds(
     )
 
 
-@router.delete("/{build_id}", response_model=DeleteResponse)
-async def delete_build(
+@router.patch("/{build_id}", response_model=BuildResponse)
+async def update_build(
     build_id: str,
+    update_data: BuildUpdateRequest,
     request: Request,
+    user: Optional[AuthenticatedUser] = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
-    Delete a build.
+    Update a build.
 
-    Only the session that created the build can delete it.
+    Only the owner (by session_id or player_id) can update the build.
+    
+    Updatable fields:
+    - name
+    - description
+    - is_public
     """
     session_id = get_session_id(request)
 
@@ -333,14 +484,54 @@ async def delete_build(
         raise BuildNotFoundError(build_id)
 
     # Check ownership
-    if build.session_id != session_id:
+    if not check_build_ownership(build, session_id, user):
+        raise NotOwnerError("build")
+
+    # Update fields if provided
+    if update_data.name is not None:
+        build.name = update_data.name
+    if update_data.description is not None:
+        build.description = update_data.description
+    if update_data.is_public is not None:
+        build.is_public = update_data.is_public
+
+    db.commit()
+    db.refresh(build)
+
+    logger.info(f"Updated build {build_id}")
+
+    return build_to_response(build)
+
+
+@router.delete("/{build_id}", response_model=DeleteResponse)
+async def delete_build(
+    build_id: str,
+    request: Request,
+    user: Optional[AuthenticatedUser] = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Delete a build.
+
+    Only the owner (by session_id or player_id) can delete the build.
+    """
+    session_id = get_session_id(request)
+
+    build = db.query(Build).filter(Build.build_id == build_id).first()
+
+    if not build:
+        raise BuildNotFoundError(build_id)
+
+    # Check ownership
+    if not check_build_ownership(build, session_id, user):
         raise NotOwnerError("build")
 
     # Delete the build (votes cascade due to relationship)
     db.delete(build)
     db.commit()
 
-    logger.info(f"Deleted build {build_id} by session {session_id[:8]}...")
+    owner_info = f"player {user.player_id}" if user else f"session {session_id[:8]}..."
+    logger.info(f"Deleted build {build_id} by {owner_info}")
 
     return DeleteResponse(build_id=build_id)
 
@@ -350,12 +541,14 @@ async def vote_build(
     build_id: str,
     vote_data: VoteRequest,
     request: Request,
+    user: Optional[AuthenticatedUser] = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """
     Vote on a build (1-5 stars).
 
     Each session can only vote once per build.
+    Each authenticated player can only vote once per build.
     Voting updates the build's aggregate rating.
     """
     session_id = get_session_id(request)
@@ -366,19 +559,26 @@ async def vote_build(
     if not build:
         raise BuildNotFoundError(build_id)
 
-    # Check if already voted
-    existing_vote = db.query(BuildVote).filter(
-        BuildVote.build_id == build_id,
-        BuildVote.session_id == session_id
-    ).first()
-
-    if existing_vote:
+    # Check if already voted - check both session and player
+    existing_vote_query = db.query(BuildVote).filter(BuildVote.build_id == build_id)
+    
+    if user:
+        # Check for existing vote by player_id
+        existing_vote = existing_vote_query.filter(BuildVote.player_id == user.player_id).first()
+        if existing_vote:
+            raise AlreadyVotedError(build_id)
+    
+    # Also check session-based vote
+    existing_session_vote = existing_vote_query.filter(BuildVote.session_id == session_id).first()
+    if existing_session_vote:
         raise AlreadyVotedError(build_id)
 
-    # Create vote
+    # Create vote with authentication info if available
     vote = BuildVote(
         build_id=build_id,
         session_id=session_id,
+        player_id=user.player_id if user else None,
+        steam_id=user.steam_id if user else None,
         rating=vote_data.rating,
     )
 
@@ -396,7 +596,8 @@ async def vote_build(
         db.rollback()
         raise AlreadyVotedError(build_id)
 
-    logger.info(f"Vote {vote_data.rating}/5 on build {build_id} by session {session_id[:8]}...")
+    voter_info = f"player {user.player_id}" if user else f"session {session_id[:8]}..."
+    logger.info(f"Vote {vote_data.rating}/5 on build {build_id} by {voter_info}")
 
     return VoteResponse(
         build_id=build_id,
@@ -412,13 +613,17 @@ async def builds_health():
     """Health check for builds API."""
     return {
         "status": "operational",
-        "message": "Builds API is fully implemented",
+        "message": "Builds API is fully implemented with Steam authentication",
+        "auth_required_for_writes": settings.AUTH_REQUIRED_FOR_WRITES,
         "endpoints": [
             "POST /api/v1/builds - Create build",
             "GET /api/v1/builds/popular - Get popular builds",
             "GET /api/v1/builds/{build_id} - Get build",
             "GET /api/v1/builds - List builds",
+            "PATCH /api/v1/builds/{build_id} - Update build",
             "DELETE /api/v1/builds/{build_id} - Delete build",
             "POST /api/v1/builds/{build_id}/vote - Vote on build",
+            "GET /api/v1/builds/auth/status - Check auth status",
+            "POST /api/v1/builds/auth/claim - Claim anonymous builds",
         ]
     }
