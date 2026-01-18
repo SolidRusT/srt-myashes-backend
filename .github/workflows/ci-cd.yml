@@ -5,13 +5,52 @@ on:
     branches: [ main ]
     paths:
       - 'backend/**'
+      - 'k8s/**'
       - '.github/workflows/ci-cd.yml'
   pull_request:
     branches: [ main ]
     paths:
       - 'backend/**'
+      - 'k8s/**'
 
 jobs:
+  security-check:
+    name: Security Validation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check for placeholder secrets in K8s manifests
+        run: |
+          echo "Checking for insecure placeholder values in K8s manifests..."
+          # Check for common placeholder patterns that should never be deployed
+          if grep -rE "(CHANGE_ME|REPLACE_WITH|<.*PASSWORD.*>|<.*SECRET.*>|changeme|placeholder)" k8s/*.yaml 2>/dev/null; then
+            echo ""
+            echo "ERROR: Found placeholder secrets in deployable K8s YAML files!"
+            echo "These files should use .template suffix and real secrets should be"
+            echo "created via kubectl, sealed-secrets, or external-secrets."
+            echo ""
+            echo "See k8s/03-secret.yaml.template for documentation."
+            exit 1
+          fi
+          echo "No placeholder secrets found in deployable manifests."
+
+      - name: Verify secret templates are properly named
+        run: |
+          echo "Checking that secret files use .template suffix..."
+          # Find any secret YAML files that aren't templates or sealed-secrets
+          INSECURE_FILES=$(find k8s -name '*secret*.yaml' ! -name '*.template' ! -name '*sealed*' 2>/dev/null || true)
+          if [ -n "$INSECURE_FILES" ]; then
+            echo ""
+            echo "ERROR: Found secret files without .template suffix:"
+            echo "$INSECURE_FILES"
+            echo ""
+            echo "Secret templates must use .yaml.template extension."
+            echo "Only sealed-secrets (encrypted) should use .yaml extension."
+            exit 1
+          fi
+          echo "All secret files properly named."
+
   lint:
     name: Lint Backend
     runs-on: ubuntu-latest
@@ -62,7 +101,7 @@ jobs:
 
   test:
     name: Test Backend
-    needs: lint
+    needs: [lint, security-check]
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -175,7 +214,7 @@ jobs:
 
       - name: Summary
         run: |
-          echo "### Docker Image Built 🐳" >> $GITHUB_STEP_SUMMARY
+          echo "### Docker Image Built" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Image:** \`${{ steps.image-tag.outputs.image }}\`" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY

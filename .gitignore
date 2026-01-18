@@ -7,6 +7,16 @@
 .env.staging
 *.env
 
+# Kubernetes secrets (SECURITY: prevent accidental commit of real secrets)
+# Only .template files should be committed
+k8s/*-secret.yaml
+k8s/*-secrets.yaml
+!k8s/*-secret.yaml.template
+!k8s/*-secrets.yaml.template
+# Sealed secrets ARE safe to commit (they're encrypted)
+!k8s/*-sealed-secret.yaml
+!k8s/*-sealed-secrets.yaml
+
 # Python - Backend/Data Pipeline
 __pycache__/
 *.py[cod]
