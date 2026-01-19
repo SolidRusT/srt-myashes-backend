@@ -24,6 +24,11 @@ class Build(Base):
     - steam_id: Steam 64-bit ID
     - steam_display_name: Steam persona name at creation time
     - user_id: Kept for backward compatibility (may be same as player_id)
+    
+    Template builds:
+    - is_template: True for official template builds
+    - Templates are read-only (cannot be modified or deleted)
+    - Templates are shown prominently in the frontend
     """
     __tablename__ = "builds"
 
@@ -41,6 +46,9 @@ class Build(Base):
 
     # Visibility
     is_public = Column(Boolean, default=True, nullable=False)
+    
+    # Template flag - official starter builds that are read-only
+    is_template = Column(Boolean, default=False, nullable=False, index=True)
 
     # Anonymous ownership (always set for all builds)
     session_id = Column(String(64), index=True, nullable=False)  # For anonymous users
@@ -74,6 +82,8 @@ class Build(Base):
     @property
     def creator_display_name(self) -> str:
         """Get the display name for the build creator."""
+        if self.is_template:
+            return "MyAshes Official"
         if self.steam_display_name:
             return self.steam_display_name
         return "anonymous"
@@ -84,7 +94,8 @@ class Build(Base):
         return self.player_id is not None
 
     def __repr__(self):
-        return f"<Build {self.build_id}: {self.name} ({self.class_name})>"
+        template_marker = " [TEMPLATE]" if self.is_template else ""
+        return f"<Build {self.build_id}: {self.name} ({self.class_name}){template_marker}>"
 
 
 class BuildVote(Base):
