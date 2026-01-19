@@ -40,6 +40,14 @@ class Settings(BaseSettings):
     POSTGRES_DB: str = os.getenv("POSTGRES_DB", "myashes")
     SQLALCHEMY_DATABASE_URI: Optional[str] = None
 
+    # Database connection pool settings (Issue #10)
+    # Sized for 6 replicas with KEDA autoscaling (0-10)
+    # With pool_size=10 and max_overflow=20, each replica handles up to 30 connections
+    DB_POOL_SIZE: int = int(os.getenv("DB_POOL_SIZE", "10"))
+    DB_MAX_OVERFLOW: int = int(os.getenv("DB_MAX_OVERFLOW", "20"))
+    DB_POOL_TIMEOUT: int = int(os.getenv("DB_POOL_TIMEOUT", "30"))
+    DB_POOL_RECYCLE: int = int(os.getenv("DB_POOL_RECYCLE", "3600"))
+
     @model_validator(mode='before')
     @classmethod
     def assemble_db_connection(cls, values: Dict[str, Any]) -> Dict[str, Any]:
