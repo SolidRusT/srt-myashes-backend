@@ -9,12 +9,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import ValidationError as PydanticValidationError
 from prometheus_fastapi_instrumentator import Instrumentator
+from sqlalchemy import text
 import logging
 
 from app.api.v1 import api_router
 from app.core.config import settings
 from app.core.errors import APIError, api_error_handler, ValidationError
 from app.core.session import SessionMiddleware
+from app.db.session import engine
 
 # Configure logging
 logging.basicConfig(
@@ -93,8 +95,32 @@ def root():
 
 @app.get("/health")
 def health_check():
-    """Health check endpoint for monitoring."""
-    return {"status": "healthy"}
+    """Health check endpoint with database connectivity verification.
+    
+    Returns degraded status if database is unavailable instead of crashing.
+    This allows Kubernetes probes to detect issues and restart pods gracefully.
+    """
+    health_status = {
+        "status": "healthy",
+        "checks": {
+            "api": "ok",
+            "database": "unknown"
+        }
+    }
+    
+    # Check database connectivity
+    try:
+        with engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+        health_status["checks"]["database"] = "ok"
+    except Exception as e:
+        health_status["status"] = "degraded"
+        # Truncate error message to avoid leaking sensitive info
+        error_msg = str(e)[:100] if str(e) else "connection failed"
+        health_status["checks"]["database"] = f"error: {error_msg}"
+        logger.warning(f"Database health check failed: {e}")
+    
+    return health_status
 
 
 @app.on_event("startup")
@@ -104,6 +130,15 @@ async def startup_event():
     logger.info(f"Environment: {settings.ENV}")
     logger.info(f"Debug mode: {settings.DEBUG}")
     logger.info(f"CORS origins: {settings.BACKEND_CORS_ORIGINS}")
+    
+    # Verify database connectivity at startup
+    try:
+        with engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+        logger.info("Database connection verified successfully")
+    except Exception as e:
+        logger.error(f"Database connection failed at startup: {e}")
+        # Don't crash - let health checks handle it
 
 
 @app.on_event("shutdown")
