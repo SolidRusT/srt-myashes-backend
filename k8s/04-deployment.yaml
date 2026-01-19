@@ -54,23 +54,40 @@ spec:
             cpu: 500m
             memory: 512Mi
 
+        # Liveness probe - restart pod if unhealthy for extended period
+        # Uses /health endpoint which now checks database connectivity
         livenessProbe:
           httpGet:
             path: /health
             port: 8000
           initialDelaySeconds: 30
-          periodSeconds: 30
+          periodSeconds: 10
           timeoutSeconds: 5
           failureThreshold: 3
+          # Pod restarts after 3 consecutive failures (30s total)
 
+        # Readiness probe - remove from service if database unavailable
+        # More aggressive than liveness to quickly remove unhealthy pods from load balancer
         readinessProbe:
           httpGet:
             path: /health
             port: 8000
           initialDelaySeconds: 10
-          periodSeconds: 10
+          periodSeconds: 5
           timeoutSeconds: 3
-          failureThreshold: 3
+          failureThreshold: 2
+          # Pod removed from service after 2 consecutive failures (10s total)
+
+        # Startup probe - allow longer startup time for migrations
+        startupProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 30
+          # Allows up to 150s (5s * 30) for startup including migrations
 
         # Security context
         securityContext:
