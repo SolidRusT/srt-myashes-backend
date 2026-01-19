@@ -6,7 +6,7 @@ Endpoints:
 - GET /api/v1/builds/popular - Get popular/trending builds for widget
 - GET /api/v1/builds/templates - Get official template builds
 - GET /api/v1/builds/{build_id} - Get a specific build
-- GET /api/v1/builds - List public builds with filters
+- GET /api/v1/builds - List public builds with filters and search
 - PATCH /api/v1/builds/{build_id} - Update a build (owner only, not templates)
 - DELETE /api/v1/builds/{build_id} - Delete a build (owner only, not templates)
 - POST /api/v1/builds/{build_id}/vote - Vote on a build
@@ -23,7 +23,7 @@ Authentication Strategy:
 """
 from fastapi import APIRouter, Depends, Query, Request, status
 from sqlalchemy.orm import Session
-from sqlalchemy import desc, func
+from sqlalchemy import desc, func, or_
 from sqlalchemy.exc import IntegrityError
 from typing import Optional
 from datetime import datetime, timedelta
@@ -435,6 +435,7 @@ async def get_build(
 @router.get("", response_model=BuildListResponse)
 async def list_builds(
     request: Request,
+    search: Optional[str] = Query(None, min_length=2, max_length=100, description="Search by name or description (partial match)"),
     class_name: Optional[str] = None,
     primary_archetype: Optional[str] = None,
     secondary_archetype: Optional[str] = None,
@@ -446,7 +447,10 @@ async def list_builds(
     db: Session = Depends(get_db)
 ):
     """
-    List public builds with filtering and pagination.
+    List public builds with filtering, search, and pagination.
+
+    Search:
+    - search: Text search across build name and description (case-insensitive partial match)
 
     Filters:
     - class_name: Filter by computed class name (e.g., "Knight")
@@ -459,9 +463,24 @@ async def list_builds(
     - newest: Most recently created first
     - rating: Highest rated first
     - popular: Most votes first
+    
+    Search and filters can be combined. For example:
+    - ?search=tank&class_name=Guardian - Search for "tank" within Guardian builds
+    - ?search=healer&is_template=true - Search for "healer" in template builds only
     """
     # Base query - only public builds
     query = db.query(Build).filter(Build.is_public == True)
+
+    # Apply text search (case-insensitive partial match on name and description)
+    if search:
+        search_term = f"%{search}%"
+        query = query.filter(
+            or_(
+                Build.name.ilike(search_term),
+                Build.description.ilike(search_term),
+                Build.class_name.ilike(search_term),  # Also search class name for convenience
+            )
+        )
 
     # Apply filters
     if class_name:
@@ -673,14 +692,14 @@ async def builds_health():
     """Health check for builds API."""
     return {
         "status": "operational",
-        "message": "Builds API is fully implemented with Steam authentication and templates",
+        "message": "Builds API is fully implemented with Steam authentication, templates, and search",
         "auth_required_for_writes": settings.AUTH_REQUIRED_FOR_WRITES,
         "endpoints": [
             "POST /api/v1/builds - Create build",
             "GET /api/v1/builds/templates - Get template builds",
             "GET /api/v1/builds/popular - Get popular builds",
             "GET /api/v1/builds/{build_id} - Get build",
-            "GET /api/v1/builds - List builds",
+            "GET /api/v1/builds - List builds (with search)",
             "PATCH /api/v1/builds/{build_id} - Update build",
             "DELETE /api/v1/builds/{build_id} - Delete build",
             "POST /api/v1/builds/{build_id}/vote - Vote on build",
