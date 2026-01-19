@@ -4,10 +4,11 @@ Builds API Router - Character build persistence and sharing.
 Endpoints:
 - POST /api/v1/builds - Create a new build
 - GET /api/v1/builds/popular - Get popular/trending builds for widget
+- GET /api/v1/builds/templates - Get official template builds
 - GET /api/v1/builds/{build_id} - Get a specific build
 - GET /api/v1/builds - List public builds with filters
-- PATCH /api/v1/builds/{build_id} - Update a build (owner only)
-- DELETE /api/v1/builds/{build_id} - Delete a build (owner only)
+- PATCH /api/v1/builds/{build_id} - Update a build (owner only, not templates)
+- DELETE /api/v1/builds/{build_id} - Delete a build (owner only, not templates)
 - POST /api/v1/builds/{build_id}/vote - Vote on a build
 - GET /api/v1/builds/auth/status - Check authentication status
 - POST /api/v1/builds/auth/claim - Claim anonymous builds
@@ -18,6 +19,7 @@ Authentication Strategy:
 - Authenticated users (Steam via PAM) get their Steam identity attached to builds
 - Build ownership is checked via session_id OR player_id
 - When AUTH_REQUIRED_FOR_WRITES=true, only authenticated users can create/modify
+- Template builds are read-only and cannot be modified or deleted
 """
 from fastapi import APIRouter, Depends, Query, Request, status
 from sqlalchemy.orm import Session
@@ -40,6 +42,7 @@ from app.schemas.builds import (
     DeleteResponse,
     PopularBuildItem,
     PopularBuildsResponse,
+    TemplateListResponse,
     TimePeriod,
     CreatorInfo,
     AuthStatusResponse,
@@ -89,6 +92,7 @@ def build_to_response(build: Build) -> BuildResponse:
         class_name=build.class_name,
         race=build.race,
         is_public=build.is_public,
+        is_template=build.is_template,
         share_url=build_share_url(build.build_id),
         created_at=build.created_at,
         updated_at=build.updated_at,
@@ -109,6 +113,7 @@ def build_to_list_item(build: Build) -> BuildListItem:
         secondary_archetype=build.secondary_archetype,
         class_name=build.class_name,
         race=build.race,
+        is_template=build.is_template,
         rating=build.avg_rating,
         vote_count=build.vote_count,
         created_at=build.created_at,
@@ -123,6 +128,7 @@ def build_to_popular_item(build: Build) -> PopularBuildItem:
         name=build.name,
         class_name=build.class_name,
         race=build.race,
+        is_template=build.is_template,
         rating=build.avg_rating,
         vote_count=build.vote_count,
         share_url=build_share_url(build.build_id),
@@ -137,7 +143,13 @@ def check_build_ownership(build: Build, session_id: str, user: Optional[Authenti
     Ownership is determined by:
     1. Matching session_id (anonymous ownership)
     2. Matching player_id (authenticated ownership via PAM)
+    
+    Note: Template builds are never owned by users.
     """
+    # Templates cannot be owned by users
+    if build.is_template:
+        return False
+    
     # Check session-based ownership
     if build.session_id == session_id:
         return True
@@ -195,7 +207,8 @@ async def claim_anonymous_builds(
     # Find all builds with the given session_id that don't have a player_id
     builds_to_claim = db.query(Build).filter(
         Build.session_id == claim_request.session_id,
-        Build.player_id == None  # noqa: E711
+        Build.player_id == None,  # noqa: E711
+        Build.is_template == False,  # Don't claim templates
     ).all()
     
     if not builds_to_claim:
@@ -282,6 +295,7 @@ async def create_build(
         class_name=class_name,
         race=build_data.race,
         is_public=build_data.is_public,
+        is_template=False,  # User-created builds are never templates
         session_id=session_id,
         # Authentication fields (if user is authenticated)
         player_id=user.player_id if user else None,
@@ -299,10 +313,35 @@ async def create_build(
     return build_to_response(build)
 
 
+@router.get("/templates", response_model=TemplateListResponse)
+async def get_template_builds(
+    db: Session = Depends(get_db)
+):
+    """
+    Get all official template builds.
+    
+    Templates are pre-made builds for common archetypes to help
+    new users get started. They are read-only and shown prominently
+    in the frontend.
+    """
+    templates = db.query(Build).filter(
+        Build.is_template == True
+    ).order_by(
+        Build.class_name,
+        Build.name
+    ).all()
+    
+    return TemplateListResponse(
+        templates=[build_to_list_item(t) for t in templates],
+        count=len(templates),
+    )
+
+
 @router.get("/popular", response_model=PopularBuildsResponse)
 async def get_popular_builds(
     period: TimePeriod = Query(TimePeriod.WEEK, description="Time period to filter by"),
     limit: int = Query(5, ge=1, le=20, description="Number of builds to return"),
+    include_templates: bool = Query(False, description="Include template builds"),
     db: Session = Depends(get_db)
 ):
     """
@@ -325,6 +364,10 @@ async def get_popular_builds(
         Build.is_public == True,
         Build.vote_count > 0
     )
+    
+    # Exclude templates unless explicitly requested
+    if not include_templates:
+        query = query.filter(Build.is_template == False)
 
     # Apply time period filter
     now = datetime.utcnow()
@@ -372,6 +415,7 @@ async def get_build(
 
     Public builds are accessible to everyone.
     Private builds are only accessible to the owner.
+    Template builds are always accessible.
     """
     session_id = get_session_id(request)
 
@@ -380,8 +424,8 @@ async def get_build(
     if not build:
         raise BuildNotFoundError(build_id)
 
-    # Check access for private builds
-    if not build.is_public:
+    # Templates are always public, other private builds need ownership check
+    if not build.is_public and not build.is_template:
         if not check_build_ownership(build, session_id, user):
             raise BuildNotFoundError(build_id)  # Don't reveal that it exists
 
@@ -395,6 +439,7 @@ async def list_builds(
     primary_archetype: Optional[str] = None,
     secondary_archetype: Optional[str] = None,
     race: Optional[str] = None,
+    is_template: Optional[bool] = Query(None, description="Filter by template status"),
     sort: str = Query("newest", pattern="^(rating|newest|popular)$"),
     page: int = Query(1, ge=1),
     limit: int = Query(20, ge=1, le=100),
@@ -408,6 +453,7 @@ async def list_builds(
     - primary_archetype: Filter by primary archetype
     - secondary_archetype: Filter by secondary archetype
     - race: Filter by race
+    - is_template: Filter by template status (true/false/null for all)
 
     Sort options:
     - newest: Most recently created first
@@ -426,6 +472,8 @@ async def list_builds(
         query = query.filter(Build.secondary_archetype == secondary_archetype.lower())
     if race:
         query = query.filter(Build.race == race.lower())
+    if is_template is not None:
+        query = query.filter(Build.is_template == is_template)
 
     # Get total count before pagination
     total = query.count()
@@ -470,6 +518,7 @@ async def update_build(
     Update a build.
 
     Only the owner (by session_id or player_id) can update the build.
+    Template builds cannot be modified.
     
     Updatable fields:
     - name
@@ -482,6 +531,10 @@ async def update_build(
 
     if not build:
         raise BuildNotFoundError(build_id)
+    
+    # Templates cannot be modified
+    if build.is_template:
+        raise NotOwnerError("build", "Template builds cannot be modified")
 
     # Check ownership
     if not check_build_ownership(build, session_id, user):
@@ -514,6 +567,7 @@ async def delete_build(
     Delete a build.
 
     Only the owner (by session_id or player_id) can delete the build.
+    Template builds cannot be deleted.
     """
     session_id = get_session_id(request)
 
@@ -521,6 +575,10 @@ async def delete_build(
 
     if not build:
         raise BuildNotFoundError(build_id)
+    
+    # Templates cannot be deleted
+    if build.is_template:
+        raise NotOwnerError("build", "Template builds cannot be deleted")
 
     # Check ownership
     if not check_build_ownership(build, session_id, user):
@@ -550,6 +608,8 @@ async def vote_build(
     Each session can only vote once per build.
     Each authenticated player can only vote once per build.
     Voting updates the build's aggregate rating.
+    
+    You can vote on template builds.
     """
     session_id = get_session_id(request)
 
@@ -613,10 +673,11 @@ async def builds_health():
     """Health check for builds API."""
     return {
         "status": "operational",
-        "message": "Builds API is fully implemented with Steam authentication",
+        "message": "Builds API is fully implemented with Steam authentication and templates",
         "auth_required_for_writes": settings.AUTH_REQUIRED_FOR_WRITES,
         "endpoints": [
             "POST /api/v1/builds - Create build",
+            "GET /api/v1/builds/templates - Get template builds",
             "GET /api/v1/builds/popular - Get popular builds",
             "GET /api/v1/builds/{build_id} - Get build",
             "GET /api/v1/builds - List builds",
