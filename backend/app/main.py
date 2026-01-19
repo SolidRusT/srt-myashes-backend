@@ -9,6 +9,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import ValidationError as PydanticValidationError
 from prometheus_fastapi_instrumentator import Instrumentator
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 from sqlalchemy import text
 import logging
 
@@ -17,6 +19,7 @@ from app.core.config import settings
 from app.core.errors import APIError, api_error_handler, ValidationError
 from app.core.session import SessionMiddleware
 from app.core.cache import check_redis_health, close_redis, get_redis
+from app.core.rate_limit import limiter, rate_limit_exceeded_handler
 from app.db.session import engine
 
 # Configure logging
@@ -29,12 +32,18 @@ logger = logging.getLogger(__name__)
 app = FastAPI(
     title=settings.APP_NAME,
     description="Backend API for MyAshes.ai - Ashes of Creation game assistant",
-    version="2.0.0",
+    version="2.1.0",
     openapi_url=f"{settings.API_V1_STR}/openapi.json",
     docs_url="/docs" if settings.DEBUG else None,
     redoc_url="/redoc" if settings.DEBUG else None,
     debug=settings.DEBUG
 )
+
+# Add rate limiter to app state
+app.state.limiter = limiter
+
+# Register rate limit exceeded handler
+app.add_exception_handler(RateLimitExceeded, rate_limit_exceeded_handler)
 
 # Initialize Prometheus metrics instrumentator
 instrumentator = Instrumentator(
@@ -59,7 +68,7 @@ if settings.BACKEND_CORS_ORIGINS:
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*", "X-Session-ID"],
-        expose_headers=["X-Session-ID"],
+        expose_headers=["X-Session-ID", "X-RateLimit-Limit", "X-RateLimit-Remaining", "X-RateLimit-Reset", "Retry-After"],
     )
 
 
@@ -88,9 +97,15 @@ def root():
     """Root endpoint - basic info."""
     return {
         "name": settings.APP_NAME,
-        "version": "2.0.0",
+        "version": "2.1.0",
         "status": "operational",
         "docs": "/docs" if settings.DEBUG else "disabled in production",
+        "features": {
+            "rate_limiting": True,
+            "authentication": True,
+            "templates": True,
+            "search": True,
+        }
     }
 
 
@@ -148,10 +163,11 @@ async def health_check():
 @app.on_event("startup")
 async def startup_event():
     """Application startup handler."""
-    logger.info(f"Starting {settings.APP_NAME} API")
+    logger.info(f"Starting {settings.APP_NAME} API v2.1.0")
     logger.info(f"Environment: {settings.ENV}")
     logger.info(f"Debug mode: {settings.DEBUG}") 
     logger.info(f"CORS origins: {settings.BACKEND_CORS_ORIGINS}")
+    logger.info(f"Rate limiting: enabled")
     
     # Verify database connectivity at startup
     try:
@@ -167,10 +183,11 @@ async def startup_event():
         client = await get_redis()
         if client:
             logger.info(f"Redis connection verified: {settings.REDIS_HOST}:{settings.REDIS_PORT}")
+            logger.info("Rate limiting will use Redis backend (distributed)")
         else:
-            logger.warning("Redis not available at startup - caching disabled")
+            logger.warning("Redis not available at startup - rate limiting will use in-memory storage")
     except Exception as e:
-        logger.warning(f"Redis connection failed at startup: {e} - caching disabled")
+        logger.warning(f"Redis connection failed at startup: {e} - rate limiting will use in-memory storage")
 
 
 @app.on_event("shutdown")
