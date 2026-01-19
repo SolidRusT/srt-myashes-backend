@@ -16,6 +16,7 @@ from app.api.v1 import api_router
 from app.core.config import settings
 from app.core.errors import APIError, api_error_handler, ValidationError
 from app.core.session import SessionMiddleware
+from app.core.cache import check_redis_health, close_redis, get_redis
 from app.db.session import engine
 
 # Configure logging
@@ -94,31 +95,52 @@ def root():
 
 
 @app.get("/health")
-def health_check():
-    """Health check endpoint with database connectivity verification.
+async def health_check():
+    """Health check endpoint with database and Redis connectivity verification.
     
-    Returns degraded status if database is unavailable instead of crashing.
+    Returns degraded status if any dependency is unavailable instead of crashing.
     This allows Kubernetes probes to detect issues and restart pods gracefully.
+    
+    Status levels:
+    - healthy: All dependencies operational
+    - degraded: Some non-critical dependencies unavailable (e.g., Redis)
+    - unhealthy: Critical dependencies unavailable (e.g., database)
     """
     health_status = {
         "status": "healthy",
         "checks": {
             "api": "ok",
-            "database": "unknown"
+            "database": "unknown",
+            "redis": "unknown"
         }
     }
     
-    # Check database connectivity
+    has_critical_failure = False
+    has_degradation = False
+    
+    # Check database connectivity (critical)
     try:
         with engine.connect() as conn:
             conn.execute(text("SELECT 1"))
         health_status["checks"]["database"] = "ok"
     except Exception as e:
-        health_status["status"] = "degraded"
-        # Truncate error message to avoid leaking sensitive info
+        has_critical_failure = True
         error_msg = str(e)[:100] if str(e) else "connection failed"
         health_status["checks"]["database"] = f"error: {error_msg}"
         logger.warning(f"Database health check failed: {e}")
+    
+    # Check Redis connectivity (non-critical - app can run without cache)
+    redis_healthy, redis_status = await check_redis_health()
+    health_status["checks"]["redis"] = redis_status
+    if not redis_healthy:
+        has_degradation = True
+        logger.debug(f"Redis health check: {redis_status}")
+    
+    # Determine overall status
+    if has_critical_failure:
+        health_status["status"] = "unhealthy"
+    elif has_degradation:
+        health_status["status"] = "degraded"
     
     return health_status
 
@@ -128,7 +150,7 @@ async def startup_event():
     """Application startup handler."""
     logger.info(f"Starting {settings.APP_NAME} API")
     logger.info(f"Environment: {settings.ENV}")
-    logger.info(f"Debug mode: {settings.DEBUG}")
+    logger.info(f"Debug mode: {settings.DEBUG}") 
     logger.info(f"CORS origins: {settings.BACKEND_CORS_ORIGINS}")
     
     # Verify database connectivity at startup
@@ -139,9 +161,22 @@ async def startup_event():
     except Exception as e:
         logger.error(f"Database connection failed at startup: {e}")
         # Don't crash - let health checks handle it
+    
+    # Verify Redis connectivity at startup (non-blocking)
+    try:
+        client = await get_redis()
+        if client:
+            logger.info(f"Redis connection verified: {settings.REDIS_HOST}:{settings.REDIS_PORT}")
+        else:
+            logger.warning("Redis not available at startup - caching disabled")
+    except Exception as e:
+        logger.warning(f"Redis connection failed at startup: {e} - caching disabled")
 
 
 @app.on_event("shutdown")
 async def shutdown_event():
     """Application shutdown handler."""
     logger.info(f"Shutting down {settings.APP_NAME} API")
+    
+    # Close Redis connection gracefully
+    await close_redis()
