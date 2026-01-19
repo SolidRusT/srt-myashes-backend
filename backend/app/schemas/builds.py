@@ -64,6 +64,7 @@ class BuildResponse(BaseModel):
     class_name: str
     race: str
     is_public: bool
+    is_template: bool = False  # Template flag
     share_url: str
     created_at: datetime
     updated_at: datetime
@@ -86,6 +87,7 @@ class BuildListItem(BaseModel):
     secondary_archetype: str
     class_name: str
     race: str
+    is_template: bool = False  # Template flag
     rating: Optional[float] = None
     vote_count: int = 0
     created_at: datetime
@@ -112,6 +114,7 @@ class PopularBuildItem(BaseModel):
     name: str
     class_name: str
     race: str
+    is_template: bool = False  # Template flag
     rating: Optional[float] = None
     vote_count: int = 0
     share_url: str
@@ -126,6 +129,13 @@ class PopularBuildsResponse(BaseModel):
 
     builds: List[PopularBuildItem]
     period: str
+    count: int
+
+
+class TemplateListResponse(BaseModel):
+    """Response for template builds list."""
+
+    templates: List[BuildListItem]
     count: int
 
 
