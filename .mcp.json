@@ -13,15 +13,19 @@
       "args": ["-y", "mcp-server-kubernetes"]
     },
     "github": {
-      "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-github"],
-      "env": {
-        "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_TOKEN}"
-      }
+      "command": "/Users/shaun/bin/github-mcp-wrapper",
+      "args": []
     },
     "gitea": {
       "command": "/Users/shaun/bin/gitea-mcp",
       "args": ["-t", "stdio", "-host", "https://poseidon.hq.solidrust.net:30008", "-token", "${GITEA_TOKEN}"]
+    },
+    "stripe": {
+      "command": "npx",
+      "args": ["-y", "@stripe/mcp", "--tools=all"],
+      "env": {
+        "STRIPE_SECRET_KEY": "${STRIPE_SECRET_KEY}"
+      }
     }
   }
 }
