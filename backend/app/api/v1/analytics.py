@@ -10,6 +10,7 @@ from fastapi import APIRouter, Depends, Request, Query
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from app.core.business_metrics import increment_search_counter
 from app.db.session import get_db
 from app.models.analytics import SearchAnalytics
 from app.schemas.analytics import (
@@ -46,6 +47,9 @@ async def record_search(
 
     db.add(analytics)
     db.commit()
+
+    # Increment business metrics
+    increment_search_counter(mode=analytics_in.search_mode)
 
     return SearchAnalyticsResponse(recorded=True)
 

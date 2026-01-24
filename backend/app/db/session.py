@@ -8,12 +8,14 @@ connections, providing adequate headroom for traffic spikes.
 See Issue #10 for rationale.
 """
 from sqlalchemy import create_engine
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy.pool import QueuePool
 
 from app.core.config import settings
 
+# Synchronous engine for FastAPI endpoints (using psycopg2)
 engine = create_engine(
     settings.SQLALCHEMY_DATABASE_URI,
     poolclass=QueuePool,
@@ -31,6 +33,34 @@ engine = create_engine(
 )
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+
+# Async engine for background tasks (using asyncpg)
+# Convert postgresql:// to postgresql+asyncpg:// for async driver
+async_database_uri = settings.SQLALCHEMY_DATABASE_URI.replace(
+    "postgresql://", "postgresql+asyncpg://"
+).replace(
+    "postgresql+psycopg2://", "postgresql+asyncpg://"
+)
+
+async_engine = create_async_engine(
+    async_database_uri,
+    poolclass=QueuePool,
+    pool_size=5,  # Smaller pool for background tasks
+    max_overflow=10,
+    pool_timeout=30,
+    pool_recycle=3600,
+    pool_pre_ping=True,
+    echo=settings.DEBUG
+)
+
+AsyncSessionLocal = sessionmaker(
+    async_engine,
+    class_=AsyncSession,
+    expire_on_commit=False,
+    autocommit=False,
+    autoflush=False,
+)
 
 
 # Dependency to get DB session

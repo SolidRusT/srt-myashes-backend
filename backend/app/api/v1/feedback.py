@@ -10,6 +10,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Request
 from sqlalchemy.orm import Session
 
+from app.core.business_metrics import increment_feedback_counter
 from app.db.session import get_db
 from app.models.feedback import Feedback
 from app.schemas.feedback import FeedbackCreate, FeedbackResponse
@@ -57,6 +58,12 @@ async def submit_feedback(
     db.add(feedback)
     db.commit()
     db.refresh(feedback)
+
+    # Increment business metrics
+    increment_feedback_counter(
+        rating=feedback_in.rating,
+        mode=feedback_in.search_mode
+    )
 
     return FeedbackResponse(
         feedback_id=feedback.feedback_id,

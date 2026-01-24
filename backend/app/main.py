@@ -12,6 +12,7 @@ from prometheus_fastapi_instrumentator import Instrumentator
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from sqlalchemy import text
+import asyncio
 import logging
 
 from app.api.v1 import api_router
@@ -20,6 +21,7 @@ from app.core.errors import APIError, api_error_handler, ValidationError
 from app.core.session import SessionMiddleware
 from app.core.cache import check_redis_health, close_redis, get_redis
 from app.core.rate_limit import limiter, rate_limit_exceeded_handler
+from app.core.business_metrics import metrics_update_loop
 from app.db.session import engine
 
 # Configure logging
@@ -105,6 +107,7 @@ def root():
             "authentication": True,
             "templates": True,
             "search": True,
+            "business_metrics": True,
         }
     }
 
@@ -168,6 +171,7 @@ async def startup_event():
     logger.info(f"Debug mode: {settings.DEBUG}") 
     logger.info(f"CORS origins: {settings.BACKEND_CORS_ORIGINS}")
     logger.info(f"Rate limiting: enabled")
+    logger.info(f"Business metrics: enabled (5min update interval)")
     
     # Verify database connectivity at startup
     try:
@@ -188,6 +192,10 @@ async def startup_event():
             logger.warning("Redis not available at startup - rate limiting will use in-memory storage")
     except Exception as e:
         logger.warning(f"Redis connection failed at startup: {e} - rate limiting will use in-memory storage")
+    
+    # Start business metrics background task
+    asyncio.create_task(metrics_update_loop(interval_seconds=300))
+    logger.info("Business metrics background task started")
 
 
 @app.on_event("shutdown")
