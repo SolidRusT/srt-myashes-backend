@@ -22,6 +22,7 @@ from app.core.session import SessionMiddleware
 from app.core.cache import check_redis_health, close_redis, get_redis
 from app.core.rate_limit import limiter, rate_limit_exceeded_handler
 from app.core.business_metrics import metrics_update_loop
+from app.core.db_monitoring import setup_db_monitoring
 from app.db.session import engine
 
 # Configure logging
@@ -34,7 +35,7 @@ logger = logging.getLogger(__name__)
 app = FastAPI(
     title=settings.APP_NAME,
     description="Backend API for MyAshes.ai - Ashes of Creation game assistant",
-    version="2.1.0",
+    version="2.2.0",
     openapi_url=f"{settings.API_V1_STR}/openapi.json",
     docs_url="/docs" if settings.DEBUG else None,
     redoc_url="/redoc" if settings.DEBUG else None,
@@ -99,7 +100,7 @@ def root():
     """Root endpoint - basic info."""
     return {
         "name": settings.APP_NAME,
-        "version": "2.1.0",
+        "version": "2.2.0",
         "status": "operational",
         "docs": "/docs" if settings.DEBUG else "disabled in production",
         "features": {
@@ -108,6 +109,7 @@ def root():
             "templates": True,
             "search": True,
             "business_metrics": True,
+            "db_monitoring": True,
         }
     }
 
@@ -166,12 +168,16 @@ async def health_check():
 @app.on_event("startup")
 async def startup_event():
     """Application startup handler."""
-    logger.info(f"Starting {settings.APP_NAME} API v2.1.0")
+    logger.info(f"Starting {settings.APP_NAME} API v2.2.0")
     logger.info(f"Environment: {settings.ENV}")
     logger.info(f"Debug mode: {settings.DEBUG}") 
     logger.info(f"CORS origins: {settings.BACKEND_CORS_ORIGINS}")
     logger.info(f"Rate limiting: enabled")
     logger.info(f"Business metrics: enabled (5min update interval)")
+    
+    # Initialize database monitoring
+    setup_db_monitoring(engine)
+    logger.info("Database monitoring initialized (slow query threshold: 100ms)")
     
     # Verify database connectivity at startup
     try:
