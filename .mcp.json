@@ -26,6 +26,25 @@
       "env": {
         "STRIPE_SECRET_KEY": "${STRIPE_SECRET_KEY}"
       }
+    },
+    "aws": {
+      "command": "uvx",
+      "args": ["awslabs.aws-api-mcp-server@latest"],
+      "env": {
+        "AWS_REGION": "us-west-2"
+      }
+    },
+    "discord": {
+      "command": "/Users/shaun/bin/discord-mcp-wrapper",
+      "args": []
+    },
+    "postgres": {
+      "command": "/Users/shaun/bin/postgres-mcp-wrapper",
+      "args": []
+    },
+    "redis": {
+      "command": "/Users/shaun/bin/redis-mcp-wrapper",
+      "args": []
     }
   }
 }
