@@ -14,6 +14,7 @@ from slowapi.errors import RateLimitExceeded
 from sqlalchemy import text
 import asyncio
 import logging
+import time
 
 from app.api.v1 import api_router
 from app.core.config import settings
@@ -32,10 +33,21 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Application version - single source of truth
+APP_VERSION = "2.3.0"
+
+# Track application start time for uptime calculation
+_app_start_time: float = 0.0
+
+# Health check cache to avoid overhead on rapid K8s probe requests
+_health_cache: dict = {}
+_health_cache_ttl: float = 1.0  # 1 second cache TTL
+_health_cache_time: float = 0.0
+
 app = FastAPI(
     title=settings.APP_NAME,
     description="Backend API for MyAshes.ai - Ashes of Creation game assistant",
-    version="2.2.0",
+    version=APP_VERSION,
     openapi_url=f"{settings.API_V1_STR}/openapi.json",
     docs_url="/docs" if settings.DEBUG else None,
     redoc_url="/redoc" if settings.DEBUG else None,
@@ -100,7 +112,7 @@ def root():
     """Root endpoint - basic info."""
     return {
         "name": settings.APP_NAME,
-        "version": "2.2.0",
+        "version": APP_VERSION,
         "status": "operational",
         "docs": "/docs" if settings.DEBUG else "disabled in production",
         "features": {
@@ -114,47 +126,73 @@ def root():
     }
 
 
-@app.get("/health")
-async def health_check():
-    """Health check endpoint with database and Redis connectivity verification.
+async def _perform_health_checks() -> dict:
+    """
+    Perform actual health checks with latency measurements.
     
-    Returns degraded status if any dependency is unavailable instead of crashing.
-    This allows Kubernetes probes to detect issues and restart pods gracefully.
-    
-    Status levels:
-    - healthy: All dependencies operational
-    - degraded: Some non-critical dependencies unavailable (e.g., Redis)
-    - unhealthy: Critical dependencies unavailable (e.g., database)
+    Returns a dict with status, version, dependencies, and uptime.
     """
     health_status = {
         "status": "healthy",
-        "checks": {
-            "api": "ok",
-            "database": "unknown",
-            "redis": "unknown"
-        }
+        "version": APP_VERSION,
+        "dependencies": {
+            "postgres": {"status": "unknown", "latency_ms": None},
+            "valkey": {"status": "unknown", "latency_ms": None}
+        },
+        "uptime_seconds": int(time.time() - _app_start_time) if _app_start_time > 0 else 0
     }
     
     has_critical_failure = False
     has_degradation = False
     
-    # Check database connectivity (critical)
+    # Check PostgreSQL connectivity (critical) with latency measurement
     try:
+        start = time.perf_counter()
         with engine.connect() as conn:
             conn.execute(text("SELECT 1"))
-        health_status["checks"]["database"] = "ok"
+        latency_ms = round((time.perf_counter() - start) * 1000, 1)
+        health_status["dependencies"]["postgres"] = {
+            "status": "healthy",
+            "latency_ms": latency_ms
+        }
     except Exception as e:
         has_critical_failure = True
         error_msg = str(e)[:100] if str(e) else "connection failed"
-        health_status["checks"]["database"] = f"error: {error_msg}"
+        health_status["dependencies"]["postgres"] = {
+            "status": "unhealthy",
+            "latency_ms": None,
+            "error": error_msg
+        }
         logger.warning(f"Database health check failed: {e}")
     
-    # Check Redis connectivity (non-critical - app can run without cache)
-    redis_healthy, redis_status = await check_redis_health()
-    health_status["checks"]["redis"] = redis_status
-    if not redis_healthy:
+    # Check Valkey/Redis connectivity (non-critical) with latency measurement
+    try:
+        start = time.perf_counter()
+        is_healthy, status_msg = await check_redis_health()
+        latency_ms = round((time.perf_counter() - start) * 1000, 1)
+        
+        if is_healthy:
+            health_status["dependencies"]["valkey"] = {
+                "status": "healthy",
+                "latency_ms": latency_ms
+            }
+        else:
+            has_degradation = True
+            health_status["dependencies"]["valkey"] = {
+                "status": "degraded",
+                "latency_ms": latency_ms,
+                "error": status_msg
+            }
+            logger.debug(f"Valkey health check: {status_msg}")
+    except Exception as e:
         has_degradation = True
-        logger.debug(f"Redis health check: {redis_status}")
+        error_msg = str(e)[:100] if str(e) else "connection failed"
+        health_status["dependencies"]["valkey"] = {
+            "status": "degraded",
+            "latency_ms": None,
+            "error": error_msg
+        }
+        logger.debug(f"Valkey health check failed: {e}")
     
     # Determine overall status
     if has_critical_failure:
@@ -165,10 +203,49 @@ async def health_check():
     return health_status
 
 
+@app.get("/health")
+async def health_check():
+    """
+    Health check endpoint with dependency status for Kubernetes probes.
+    
+    Returns detailed status including:
+    - Overall status: healthy | degraded | unhealthy
+    - Version: Current application version
+    - Dependencies: PostgreSQL and Valkey status with latency
+    - Uptime: Seconds since application started
+    
+    Results are cached for 1 second to avoid overhead from rapid K8s probe requests.
+    
+    Status levels:
+    - healthy: All dependencies operational
+    - degraded: Some non-critical dependencies unavailable (e.g., Valkey cache)
+    - unhealthy: Critical dependencies unavailable (e.g., PostgreSQL)
+    """
+    global _health_cache, _health_cache_time
+    
+    current_time = time.time()
+    
+    # Return cached result if within TTL
+    if _health_cache and (current_time - _health_cache_time) < _health_cache_ttl:
+        return _health_cache
+    
+    # Perform health checks
+    health_status = await _perform_health_checks()
+    
+    # Cache the result
+    _health_cache = health_status
+    _health_cache_time = current_time
+    
+    return health_status
+
+
 @app.on_event("startup")
 async def startup_event():
     """Application startup handler."""
-    logger.info(f"Starting {settings.APP_NAME} API v2.2.0")
+    global _app_start_time
+    _app_start_time = time.time()
+    
+    logger.info(f"Starting {settings.APP_NAME} API v{APP_VERSION}")
     logger.info(f"Environment: {settings.ENV}")
     logger.info(f"Debug mode: {settings.DEBUG}") 
     logger.info(f"CORS origins: {settings.BACKEND_CORS_ORIGINS}")
