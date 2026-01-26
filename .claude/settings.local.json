@@ -112,6 +112,10 @@
     "aws",
     "discord",
     "postgres",
-    "redis"
+    "redis",
+    "truenas",
+    "talos",
+    "opnsense",
+    "cloudflare"
   ]
 }
