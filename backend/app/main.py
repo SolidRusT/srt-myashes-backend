@@ -7,6 +7,7 @@ Provides build persistence, voting, feedback collection, and analytics.
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.openapi.utils import get_openapi
 from pydantic import ValidationError as PydanticValidationError
 from prometheus_fastapi_instrumentator import Instrumentator
 from slowapi import _rate_limit_exceeded_handler
@@ -44,14 +45,69 @@ _health_cache: dict = {}
 _health_cache_ttl: float = 1.0  # 1 second cache TTL
 _health_cache_time: float = 0.0
 
+# OpenAPI documentation description with session header info
+API_DESCRIPTION = """
+## MyAshes.ai Backend API
+
+Product-specific backend for the Ashes of Creation game assistant.
+Provides build sharing, voting, feedback, and analytics.
+
+### Authentication
+
+**Session-Based (Anonymous)**
+- Include `X-Session-ID` header for session tracking
+- Format: `sess_` + 24 hex characters
+- If not provided, server generates one and returns in response header
+
+**Steam Login (Authenticated)**
+- Login via PAM Platform at console.solidrust.ai
+- Include `Authorization: Bearer <token>` header
+- Authenticated users have persistent ownership of builds
+
+### Rate Limiting
+
+Rate limit headers are included in responses:
+- `X-RateLimit-Limit`: Maximum requests per window
+- `X-RateLimit-Remaining`: Remaining requests in current window
+- `X-RateLimit-Reset`: Seconds until limit resets
+- `Retry-After`: Seconds to wait (only when rate limited)
+
+### Error Responses
+
+All errors follow this format:
+```json
+{
+  "error": "error_code",
+  "message": "Human-readable message",
+  "status": 404
+}
+```
+
+Common error codes:
+- `not_found`: Resource does not exist
+- `unauthorized`: Missing or invalid authentication
+- `forbidden`: Not allowed to perform action
+- `validation_error`: Invalid request data
+- `rate_limited`: Too many requests
+"""
+
 app = FastAPI(
     title=settings.APP_NAME,
-    description="Backend API for MyAshes.ai - Ashes of Creation game assistant",
+    description=API_DESCRIPTION,
     version=APP_VERSION,
-    openapi_url=f"{settings.API_V1_STR}/openapi.json",
-    docs_url="/docs" if settings.DEBUG else None,
-    redoc_url="/redoc" if settings.DEBUG else None,
-    debug=settings.DEBUG
+    openapi_url=f"{settings.API_V1_STR}/openapi.json" if settings.DOCS_ENABLED else None,
+    docs_url="/docs" if settings.DOCS_ENABLED else None,
+    redoc_url="/redoc" if settings.DOCS_ENABLED else None,
+    debug=settings.DEBUG,
+    contact={
+        "name": "SolidRusT Networks",
+        "url": "https://myashes.ai",
+        "email": "support@solidrust.net",
+    },
+    license_info={
+        "name": "MIT",
+        "url": "https://opensource.org/licenses/MIT",
+    },
 )
 
 # Add rate limiter to app state
@@ -87,6 +143,49 @@ if settings.BACKEND_CORS_ORIGINS:
     )
 
 
+# Custom OpenAPI schema with X-Session-ID header documentation
+def custom_openapi():
+    if app.openapi_schema:
+        return app.openapi_schema
+    
+    openapi_schema = get_openapi(
+        title=app.title,
+        version=app.version,
+        description=app.description,
+        routes=app.routes,
+        contact=app.contact,
+        license_info=app.license_info,
+    )
+    
+    # Add X-Session-ID header as a global parameter
+    openapi_schema["components"]["securitySchemes"] = {
+        "sessionId": {
+            "type": "apiKey",
+            "in": "header",
+            "name": "X-Session-ID",
+            "description": "Session ID for anonymous user tracking. Format: sess_ + 24 hex chars. Auto-generated if not provided."
+        },
+        "bearerAuth": {
+            "type": "http",
+            "scheme": "bearer",
+            "bearerFormat": "JWT",
+            "description": "PAM Platform authentication token (from Steam login)"
+        }
+    }
+    
+    # Apply security globally
+    openapi_schema["security"] = [
+        {"sessionId": []},
+        {"bearerAuth": []}
+    ]
+    
+    app.openapi_schema = openapi_schema
+    return app.openapi_schema
+
+
+app.openapi = custom_openapi
+
+
 # Register custom exception handlers
 @app.exception_handler(APIError)
 async def handle_api_error(request: Request, exc: APIError) -> JSONResponse:
@@ -107,14 +206,16 @@ async def handle_pydantic_validation_error(request: Request, exc: PydanticValida
 app.include_router(api_router, prefix=settings.API_V1_STR)
 
 
-@app.get("/")
+@app.get("/", tags=["status"])
 def root():
-    """Root endpoint - basic info."""
+    """Root endpoint - basic info and links."""
     return {
         "name": settings.APP_NAME,
         "version": APP_VERSION,
         "status": "operational",
-        "docs": "/docs" if settings.DEBUG else "disabled in production",
+        "docs": "/docs" if settings.DOCS_ENABLED else "disabled",
+        "redoc": "/redoc" if settings.DOCS_ENABLED else "disabled",
+        "health": "/health",
         "features": {
             "rate_limiting": True,
             "authentication": True,
@@ -203,7 +304,7 @@ async def _perform_health_checks() -> dict:
     return health_status
 
 
-@app.get("/health")
+@app.get("/health", tags=["status"])
 async def health_check():
     """
     Health check endpoint with dependency status for Kubernetes probes.
@@ -247,7 +348,8 @@ async def startup_event():
     
     logger.info(f"Starting {settings.APP_NAME} API v{APP_VERSION}")
     logger.info(f"Environment: {settings.ENV}")
-    logger.info(f"Debug mode: {settings.DEBUG}") 
+    logger.info(f"Debug mode: {settings.DEBUG}")
+    logger.info(f"OpenAPI docs: {'enabled' if settings.DOCS_ENABLED else 'disabled'}")
     logger.info(f"CORS origins: {settings.BACKEND_CORS_ORIGINS}")
     logger.info(f"Rate limiting: enabled")
     logger.info(f"Business metrics: enabled (5min update interval)")
