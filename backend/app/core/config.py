@@ -75,6 +75,10 @@ class Settings(BaseSettings):
     APP_NAME: str = "MyAshes.ai"
     WEBSITE_URL: str = os.getenv("WEBSITE_URL", "https://myashes.ai")
 
+    # OpenAPI documentation configuration (Issue #18)
+    # Enable API docs in production for self-service developer experience
+    DOCS_ENABLED: bool = os.getenv("DOCS_ENABLED", "true").lower() == "true"
+
     # Session configuration
     SESSION_COOKIE_NAME: str = "myashes_session"
     SESSION_EXPIRE_DAYS: int = 30
