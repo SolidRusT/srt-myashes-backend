@@ -2,15 +2,22 @@
   "mcpServers": {
     "time": {
       "command": "uvx",
-      "args": ["mcp-server-time"]
+      "args": [
+        "mcp-server-time"
+      ]
     },
     "calculator": {
       "command": "uvx",
-      "args": ["mcp-server-calculator"]
+      "args": [
+        "mcp-server-calculator"
+      ]
     },
     "kubernetes": {
       "command": "npx",
-      "args": ["-y", "mcp-server-kubernetes"]
+      "args": [
+        "-y",
+        "mcp-server-kubernetes"
+      ]
     },
     "github": {
       "command": "/Users/shaun/bin/github-mcp-wrapper",
@@ -18,18 +25,31 @@
     },
     "gitea": {
       "command": "/Users/shaun/bin/gitea-mcp",
-      "args": ["-t", "stdio", "-host", "https://poseidon.hq.solidrust.net:30008", "-token", "${GITEA_TOKEN}"]
+      "args": [
+        "-t",
+        "stdio",
+        "-host",
+        "https://poseidon.hq.solidrust.net:30008",
+        "-token",
+        "${GITEA_TOKEN}"
+      ]
     },
     "stripe": {
       "command": "npx",
-      "args": ["-y", "@stripe/mcp", "--tools=all"],
+      "args": [
+        "-y",
+        "@stripe/mcp",
+        "--tools=all"
+      ],
       "env": {
         "STRIPE_SECRET_KEY": "${STRIPE_SECRET_KEY}"
       }
     },
     "aws": {
       "command": "uvx",
-      "args": ["awslabs.aws-api-mcp-server@latest"],
+      "args": [
+        "awslabs.aws-api-mcp-server@latest"
+      ],
       "env": {
         "AWS_REGION": "us-west-2"
       }
@@ -45,6 +65,35 @@
     "redis": {
       "command": "/Users/shaun/bin/redis-mcp-wrapper",
       "args": []
+    },
+    "truenas": {
+      "command": "uvx",
+      "args": [
+        "truenas-mcp-server"
+      ],
+      "env": {
+        "TRUENAS_URL": "https://poseidon.hq.solidrust.net",
+        "TRUENAS_API_KEY": "${TRUENAS_API_KEY}"
+      }
+    },
+    "talos": {
+      "command": "/Users/shaun/bin/talos-mcp",
+      "args": [],
+      "env": {
+        "TALOSCONFIG": "${HOME}/.talos/config"
+      }
+    },
+    "opnsense": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@richard-stovall/opnsense-mcp-server"
+      ],
+      "env": {
+        "OPNSENSE_HOST": "prometheus.hq.solidrust.net",
+        "OPNSENSE_API_KEY": "${OPNSENSE_API_KEY}",
+        "OPNSENSE_API_SECRET": "${OPNSENSE_API_SECRET}"
+      }
     }
   }
 }
