@@ -9,25 +9,31 @@ metadata:
 spec:
   scaleTargetRef:
     name: myashes-backend
-  minReplicaCount: 0  # Scale to zero when idle
+  minReplicaCount: 2  # Maintain HA (was 0, but cold starts are bad for UX)
   maxReplicaCount: 10
   cooldownPeriod: 300  # 5 minutes before scaling down
-  pollingInterval: 30
+  pollingInterval: 15
 
   triggers:
-  # Scale based on HTTP requests per second (requires Prometheus)
-  - type: prometheus
-    metadata:
-      serverAddress: http://prometheus-server.monitoring.svc.cluster.local
-      metricName: http_requests_total
-      query: sum(rate(http_requests_total{namespace="myashes-backend"}[2m]))
-      threshold: "100"  # Scale up when > 100 req/sec
-
-  # Or use CPU-based scaling as fallback
+  # Scale based on CPU utilization
   - type: cpu
     metricType: Utilization
     metadata:
       value: "70"  # Scale up when CPU > 70%
+
+  # Scale based on memory utilization
+  - type: memory
+    metricType: Utilization
+    metadata:
+      value: "80"  # Scale up when memory > 80%
+
+  # Scale based on HTTP requests per second (via nginx ingress metrics)
+  - type: prometheus
+    metadata:
+      serverAddress: http://kube-prometheus-stack-prometheus.monitoring:9090
+      metricName: myashes_http_requests_per_second
+      query: sum(rate(nginx_ingress_controller_requests{exported_service="myashes-backend"}[2m]))
+      threshold: "50"  # Scale up when > 50 req/sec
 
 ---
 # Optional: Configure scale-to-zero behavior

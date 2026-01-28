@@ -15,6 +15,32 @@ spec:
       labels:
         app: myashes-backend
     spec:
+      # Spread across nodes, avoid legacy CPU tier
+      affinity:
+        nodeAffinity:
+          # Avoid legacy CPU tier nodes (Gen4 Xeon, DDR3)
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              preference:
+                matchExpressions:
+                  - key: hardware.io/cpu-tier
+                    operator: In
+                    values: ["premium", "standard"]
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app: myashes-backend
+                topologyKey: kubernetes.io/hostname
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app: myashes-backend
       # Init container to wait for PostgreSQL
       initContainers:
       - name: wait-for-postgres

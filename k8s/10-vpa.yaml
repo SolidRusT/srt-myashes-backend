@@ -1,0 +1,29 @@
+---
+# VPA for MyAshes Backend
+# Automatically adjusts CPU/memory requests based on actual usage
+#
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: myashes-backend-vpa
+  namespace: myashes-backend
+  labels:
+    app: myashes-backend
+spec:
+  targetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: myashes-backend
+  updatePolicy:
+    updateMode: "Auto"
+  resourcePolicy:
+    containerPolicies:
+      - containerName: myashes-backend
+        minAllowed:
+          cpu: 50m
+          memory: 128Mi
+        maxAllowed:
+          cpu: 1
+          memory: 1Gi
+        controlledResources: ["cpu", "memory"]
+        controlledValues: RequestsAndLimits

@@ -1,0 +1,16 @@
+---
+# PodDisruptionBudget for MyAshes Backend
+# Ensures at least 1 replica is available during voluntary disruptions
+#
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: myashes-backend
+  namespace: myashes-backend
+  labels:
+    app: myashes-backend
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: myashes-backend
